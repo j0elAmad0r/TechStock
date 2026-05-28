@@ -38,12 +38,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.joel.proyecto2026.ui.viewmodel.LoginViewModel
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     vm: LoginViewModel,
-    onLoginSuccess: () -> Unit = {}
+    onLoginSuccess: () -> Unit = {},
+    onRegisterClick: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsState()
 
@@ -113,15 +118,15 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
             // Logo placeholder
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Logo",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(88.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Brush.verticalGradient(listOf(PrimaryLight, PrimaryLight2))),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("TS", style = MaterialTheme.typography.titleLarge, color = Color.White)
-            }
+                    .background(Brush.verticalGradient(listOf(PrimaryLight, PrimaryLight2)))
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 "TechStock",
@@ -233,7 +238,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     TextButton(
-                        onClick = { /* navegar a registro */ },
+                        onClick = onRegisterClick,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text("¿No tienes cuenta? Regístrate")
