@@ -13,16 +13,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -45,11 +51,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import coil.compose.AsyncImage
 import com.joel.proyecto2026.R
+import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
+import com.joel.proyecto2026.network.CategoryDto
+import com.joel.proyecto2026.network.ProductDto
 import com.joel.proyecto2026.ui.theme.PrimaryLight
 import com.joel.proyecto2026.ui.theme.PrimaryLight2
+import androidx.compose.ui.window.Dialog
 
 private data class CategoryItem(
     val title: String,
@@ -62,35 +75,76 @@ private data class FeaturedItem(
     val price: String,
     val stockLabel: String,
     val accent: Color,
-    val badge: String
+    val badge: String,
+    val imageUrl: String? = null
 )
 
 @Composable
 fun HomeScreen(
     userName: String?,
+    homeViewModel: HomeViewModel? = null,
+    onOpenInventory: (() -> Unit)? = null,
+    onOpenProviders: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
+    onProductClick: ((ProductDto) -> Unit)? = null,
+    onProfileClick: (() -> Unit)? = null
 ) {
-    val categories = listOf(
-        CategoryItem("Procesadores", "CPU", Color(0xFF4DA3FF)),
-        CategoryItem("Memorias", "RAM", Color(0xFF38D996)),
-        CategoryItem("Tarjetas", "GPU", Color(0xFFFFA64D)),
-        CategoryItem("Sensores", "I/O", Color(0xFF5DB8FF))
-    )
+    val colors = listOf(Color(0xFF4DA3FF), Color(0xFF38D996), Color(0xFFFFA64D), Color(0xFF5DB8FF), Color(0xFF7EC8FF))
 
-    val featuredItems = listOf(
-        FeaturedItem("AMD Ryzen 5 5600X", "$159.99", "En stock: 24", Color(0xFF4DA3FF), "R5"),
-        FeaturedItem("Corsair Vengeance 16GB DDR4", "$49.99", "En stock: 38", Color(0xFF38D996), "16G"),
-        FeaturedItem("MSI GeForce RTX 3060", "$329.99", "En stock: 12", Color(0xFFFFA64D), "RTX"),
-        FeaturedItem("Sensor DHT22", "$8.99", "En stock: 56", Color(0xFF7EC8FF), "D22")
-    )
+    val categories = if (homeViewModel != null && homeViewModel.categories.isNotEmpty()) {
+        homeViewModel.categories.mapIndexed { idx, c ->
+            CategoryItem(
+                title = c.name ?: c.query ?: "Categoría",
+                badge = (c.name ?: c.query ?: "CAT").take(3).uppercase(),
+                accent = colors[idx % colors.size]
+            )
+        }
+    } else {
+        listOf(
+            CategoryItem("Procesadores", "CPU", Color(0xFF4DA3FF)),
+            CategoryItem("Memorias", "RAM", Color(0xFF38D996)),
+            CategoryItem("Tarjetas", "GPU", Color(0xFFFFA64D)),
+            CategoryItem("Placa Madre", "MB", Color(0xFF5DB8FF)),
+            CategoryItem("Almacenamiento", "SSD", Color(0xFF7EC8FF)),
+            CategoryItem("Periféricos", "PER", Color(0xFF4DA3FF)),
+            CategoryItem("Gabinete", "Gabo", Color(0xFF38D996))
+        )
+    }
+
+    val featuredItems = if (homeViewModel != null && homeViewModel.featured.isNotEmpty()) {
+        homeViewModel.featured.mapIndexed { idx, p ->
+            FeaturedItem(
+                name = p.title ?: "-",
+                price = when {
+                    !p.price.isNullOrBlank() -> p.price
+                    p.extractedPrice != null -> "$${"%.2f".format(p.extractedPrice)}"
+                    else -> "-"
+                },
+                stockLabel = p.reviews?.let { "${it} reseñas" } ?: (p.source ?: "-"),
+                accent = colors[idx % colors.size],
+                badge = (p.source ?: p.title ?: "#").take(3).uppercase(),
+                imageUrl = p.thumbnail
+            )
+        }
+    } else {
+        listOf(
+            FeaturedItem("AMD Ryzen 5 5600X", "$159.99", "En stock: 24", Color(0xFF4DA3FF), "R5"),
+            FeaturedItem("Corsair Vengeance 16GB DDR4", "$49.99", "En stock: 38", Color(0xFF38D996), "16G"),
+            FeaturedItem("MSI GeForce RTX 3060", "$329.99", "En stock: 12", Color(0xFFFFA64D), "RTX"),
+            FeaturedItem("Sensor DHT22", "$8.99", "En stock: 56", Color(0xFF7EC8FF), "D22")
+        )
+    }
 
     val bottomItems = listOf(
-        Triple("Inicio", "H", true),
-        Triple("Categorías", "C", false),
-        Triple("Inventario", "I", false),
-        Triple("Perfil", "P", false)
+        Triple("Inicio", Icons.Filled.Home, true),
+        Triple("Proveedor", Icons.Filled.Category, false),
+        Triple("Inventario", Icons.Filled.Inventory, false),
+        Triple("Perfil", Icons.Filled.Person, false)
     )
 
     var search by remember { mutableStateOf("") }
+    var showProductsDialog by remember { mutableStateOf(false) }
+    var selectedCategoryTitle by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
 
     Box(
@@ -134,7 +188,9 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(top = 4.dp)
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -184,7 +240,7 @@ fun HomeScreen(
                         color = Color.White,
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable(enabled = false) { }
+                            .clickable { onOpenSettings?.invoke() }
                             .background(Color.White.copy(alpha = 0.08f))
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         fontWeight = FontWeight.Bold,
@@ -204,17 +260,39 @@ fun HomeScreen(
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = search,
-                        onValueChange = { search = it },
-                        singleLine = true,
-                        placeholder = { Text("Buscar componentes") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp)
-                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = search,
+                            onValueChange = { search = it },
+                            singleLine = true,
+                            placeholder = { Text("Buscar componentes") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { homeViewModel?.search(search.ifBlank { "Procesadores" }) }) {
+                            Icon(Icons.Filled.Search, contentDescription = "Buscar", tint = Color(0xFF4DA3FF))
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (homeViewModel?.isLoading?.value == true) {
+                        Text(
+                            text = "Cargando resultados...",
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    } else if (!homeViewModel?.errorMessage?.value.isNullOrBlank()) {
+                        Text(
+                            text = "No se pudo cargar contenido. Intenta otra busqueda.",
+                            color = Color(0xFFFFA64D),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
                     Row(
                         modifier = Modifier
@@ -224,7 +302,13 @@ fun HomeScreen(
                     ) {
                         categories.forEach { category ->
                             Card(
-                                modifier = Modifier.size(width = 108.dp, height = 118.dp),
+                                modifier = Modifier
+                                    .size(width = 118.dp, height = 122.dp)
+                                    .clickable {
+                                        selectedCategoryTitle = category.title
+                                        showProductsDialog = true
+                                        homeViewModel?.search(category.title)
+                                    },
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
                                 shape = RoundedCornerShape(20.dp),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -253,7 +337,9 @@ fun HomeScreen(
                                         text = category.title,
                                         style = MaterialTheme.typography.titleSmall,
                                         color = Color.White,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -320,29 +406,31 @@ fun HomeScreen(
                                             .fillMaxWidth()
                                             .height(78.dp)
                                             .clip(RoundedCornerShape(16.dp))
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(
-                                                        item.accent.copy(alpha = 0.30f),
-                                                        Color.White.copy(alpha = 0.05f)
-                                                    )
-                                                )
-                                            ),
+                                            .background(Color(0xFF111827)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(52.dp)
-                                                .clip(RoundedCornerShape(16.dp))
-                                                .background(item.accent.copy(alpha = 0.18f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = item.badge,
-                                                color = item.accent,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold
+                                        if (!item.imageUrl.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = item.imageUrl,
+                                                contentDescription = item.name,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
                                             )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(52.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(item.accent.copy(alpha = 0.18f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = item.badge,
+                                                    color = item.accent,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
                                         }
                                     }
 
@@ -352,7 +440,9 @@ fun HomeScreen(
                                             color = Color.White,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Medium,
-                                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Spacer(modifier = Modifier.height(6.dp))
                                         Text(
@@ -365,7 +455,9 @@ fun HomeScreen(
                                         Text(
                                             text = item.stockLabel,
                                             color = Color(0xFF38D996),
-                                            style = MaterialTheme.typography.bodyMedium
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -428,7 +520,7 @@ fun HomeScreen(
                                     ),
                                     shape = RoundedCornerShape(24.dp)
                                 )
-                                .clickable { }
+                                .clickable { onOpenInventory?.invoke() }
                                 .padding(vertical = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -470,14 +562,21 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(14.dp))
                                             .background(
                                                 if (selected) PrimaryLight.copy(alpha = 0.22f) else Color.Transparent
-                                            ),
+                                            )
+                                            .clickable {
+                                                when (label) {
+                                                    "Proveedor" -> onOpenProviders?.invoke()
+                                                    "Inventario" -> onOpenInventory?.invoke()
+                                                    "Perfil" -> onProfileClick?.invoke()
+                                                    else -> { /* no-op */ }
+                                                }
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = icon,
-                                            color = if (selected) Color(0xFF4DA3FF) else Color.White.copy(alpha = 0.56f),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            tint = if (selected) Color(0xFF4DA3FF) else Color.White.copy(alpha = 0.56f)
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
@@ -501,6 +600,139 @@ fun HomeScreen(
                 }
             }
         }
+
+        if (showProductsDialog) {
+            Dialog(onDismissRequest = { showProductsDialog = false }) {
+                Card(
+                    modifier = Modifier.padding(12.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = selectedCategoryTitle.ifBlank { "Productos" },
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { showProductsDialog = false }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = Color.White)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        when {
+                            homeViewModel?.isLoading?.value == true -> {
+                                Text(
+                                    text = "Cargando productos...",
+                                    color = Color.White.copy(alpha = 0.72f)
+                                )
+                            }
+                            !homeViewModel?.errorMessage?.value.isNullOrBlank() -> {
+                                Text(
+                                    text = "No se pudieron cargar los productos.",
+                                    color = Color(0xFFFFA64D)
+                                )
+                            }
+                            homeViewModel?.featured?.isNotEmpty() == true -> {
+                                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    items(homeViewModel.featured.take(8)) { product ->
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    showProductsDialog = false
+                                                    onProductClick?.invoke(product)
+                                                },
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
+                                            shape = RoundedCornerShape(18.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(64.dp)
+                                                        .clip(RoundedCornerShape(14.dp))
+                                                        .background(Color(0xFF111827)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (!product.thumbnail.isNullOrBlank()) {
+                                                        AsyncImage(
+                                                            model = product.thumbnail,
+                                                            contentDescription = product.title,
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = (product.source ?: product.title ?: "#").take(3).uppercase(),
+                                                            color = Color.White
+                                                        )
+                                                    }
+                                                }
+
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = product.title ?: "-",
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = when {
+                                                            !product.price.isNullOrBlank() -> product.price
+                                                            product.extractedPrice != null -> "$${"%.2f".format(product.extractedPrice)}"
+                                                            else -> "-"
+                                                        },
+                                                        color = Color(0xFF4DA3FF),
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = "Provedor: ${product.source ?: ""}",
+                                                        color = Color.White.copy(alpha = 0.64f),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Spacer(modifier = Modifier.height(2.dp))
+                                                    Text(
+                                                        text = product.reviews?.let { "En stock: ${it / 10}" } ?: "",
+                                                        color = Color(0xFF38D996),
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                Text(
+                                    text = "No hay productos para mostrar aún.",
+                                    color = Color.White.copy(alpha = 0.72f)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Toca fuera para cerrar",
+                            color = Color.White.copy(alpha = 0.48f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+
     }
 }
 
@@ -519,12 +751,12 @@ private fun MetricTile(
                 .background(accent.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center
         ) {
-                Text(
-                    text = "+",
-                    color = accent,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+            Text(
+                text = "+",
+                color = accent,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(title, color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
@@ -532,4 +764,18 @@ private fun MetricTile(
         Text(value, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(subtitle, color = Color.White.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall)
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    HomeScreen(
+        userName = "Joel",
+        homeViewModel = null,
+        onOpenInventory = {},
+        onOpenProviders = {},
+        onOpenSettings = {},
+        onProductClick = {},
+        onProfileClick = {}
+    )
 }
