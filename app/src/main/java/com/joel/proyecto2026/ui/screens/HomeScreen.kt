@@ -29,6 +29,9 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -55,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.annotation.DrawableRes
 import coil.compose.AsyncImage
 import com.joel.proyecto2026.R
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
@@ -79,13 +83,30 @@ private data class FeaturedItem(
     val imageUrl: String? = null
 )
 
+@DrawableRes
+private fun iconoCategoriaRes(titulo: String): Int {
+    val t = titulo.lowercase()
+    return when {
+        t.contains("procesador") || t.contains("cpu") -> R.drawable.cpu
+        t.contains("memoria") || t.contains("ram") -> R.drawable.ram
+        t.contains("tarjeta") || t.contains("gpu") -> R.drawable.gpu
+        t.contains("placa") || t.contains("madre") -> R.drawable.cate
+        t.contains("almacen") || t.contains("ssd") || t.contains("hdd") -> R.drawable.ssd
+        t.contains("perif") || t.contains("mouse") || t.contains("raton") || t.contains("teclado") -> R.drawable.raton
+        t.contains("gabinete") || t.contains("case") -> R.drawable.gabiente
+        else -> R.drawable.cate
+    }
+}
+
 @Composable
-fun HomeScreen(
+fun PantallaInicio(
     userName: String?,
     homeViewModel: HomeViewModel? = null,
     onOpenInventory: (() -> Unit)? = null,
     onOpenProviders: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
+    cantidadCarrito: Int = 0,
+    onAbrirCarrito: (() -> Unit)? = null,
     onProductClick: ((ProductDto) -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null
 ) {
@@ -235,17 +256,27 @@ fun HomeScreen(
                         }
                     }
 
-                    Text(
-                        text = "☰",
-                        color = Color.White,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onOpenSettings?.invoke() }
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "☰",
+                            color = Color.White,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { onOpenSettings?.invoke() }
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        androidx.compose.material3.IconButton(onClick = { onAbrirCarrito?.invoke() }) {
+                            BadgedBox(badge = {
+                                if (cantidadCarrito > 0) Badge { Text(cantidadCarrito.toString()) }
+                            }) {
+                                Icon(Icons.Filled.ShoppingCart, contentDescription = "Carrito", tint = Color.White)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -326,11 +357,11 @@ fun HomeScreen(
                                             .background(category.accent.copy(alpha = 0.16f)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = category.badge,
-                                            color = category.accent,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Bold
+                                        Image(
+                                            painter = painterResource(id = iconoCategoriaRes(category.title)),
+                                            contentDescription = category.title,
+                                            modifier = Modifier.size(24.dp),
+                                            contentScale = ContentScale.Fit
                                         )
                                     }
                                     Text(
@@ -593,7 +624,7 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (userName.isNullOrBlank()) "Sesión local activa" else "Bienvenido, $userName",
+                        text = if (userName.isNullOrBlank()) "Sesion local activa" else "Bienvenido, $userName",
                         color = Color.White.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -768,8 +799,8 @@ private fun MetricTile(
 
 @Preview(showBackground = true)
 @Composable
-private fun HomeScreenPreview() {
-    HomeScreen(
+private fun VistaPreviaPantallaInicio() {
+    PantallaInicio(
         userName = "Joel",
         homeViewModel = null,
         onOpenInventory = {},

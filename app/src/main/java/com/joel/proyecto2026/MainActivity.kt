@@ -3,7 +3,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
@@ -14,16 +13,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import com.joel.proyecto2026.ui.screens.LoginScreen
-import com.joel.proyecto2026.ui.screens.HomeScreen
-import com.joel.proyecto2026.ui.screens.InventoryScreen
-import com.joel.proyecto2026.ui.screens.ProvidersScreen
-import com.joel.proyecto2026.ui.screens.SettingsScreen
-import com.joel.proyecto2026.ui.screens.ProductDetailDialog
+import com.joel.proyecto2026.ui.screens.PantallaInicioSesion
+import com.joel.proyecto2026.ui.screens.PantallaInicio
+import com.joel.proyecto2026.ui.screens.PantallaInventario
+import com.joel.proyecto2026.ui.screens.PantallaProveedores
+import com.joel.proyecto2026.ui.screens.PantallaConfiguracion
+import com.joel.proyecto2026.ui.screens.DialogoDetalleProducto
+import com.joel.proyecto2026.ui.screens.PantallaPago
 import com.joel.proyecto2026.repository.BestBuyRepositoryImpl
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModelFactory
-import com.joel.proyecto2026.ui.screens.RegisterScreen
+import com.joel.proyecto2026.ui.screens.PantallaRegistro
 import com.joel.proyecto2026.repository.LocalAuthRepository
 import com.joel.proyecto2026.ui.viewmodel.LoginViewModel
 import com.joel.proyecto2026.ui.viewmodel.LoginViewModelFactory
@@ -31,9 +31,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import com.joel.proyecto2026.ui.theme.Proyecto2026Theme
 import com.joel.proyecto2026.network.ProductDto
-import com.joel.proyecto2026.ui.screens.ProfileScreen
+import com.joel.proyecto2026.ui.screens.PantallaPerfil
 
-private enum class AppScreen {
+private enum class PantallaApp {
     Loading,
     Login,
     Register,
@@ -41,7 +41,8 @@ private enum class AppScreen {
     Inventory,
     Providers,
     Profile,
-    Settings
+    Settings,
+    Checkout
 }
 
 class MainActivity : ComponentActivity() {
@@ -51,88 +52,121 @@ class MainActivity : ComponentActivity() {
         val authRepository = LocalAuthRepository(applicationContext)
         setContent {
             Proyecto2026Theme {
-                var currentScreen by remember { mutableStateOf(AppScreen.Loading) }
+                var currentScreen by remember { mutableStateOf(PantallaApp.Loading) }
                 val loginVm: LoginViewModel = viewModel(
                     factory = LoginViewModelFactory(authRepository)
                 )
 
                 LaunchedEffect(Unit) {
-                    currentScreen = if (authRepository.isLoggedIn()) {
-                        AppScreen.Home
+                        currentScreen = if (authRepository.isLoggedIn()) {
+                        PantallaApp.Home
                     } else {
-                        AppScreen.Login
+                        PantallaApp.Login
                     }
                 }
 
                 val bestBuyRepo = remember { BestBuyRepositoryImpl(BuildConfig.SERPAPI_API_KEY) }
                 val homeVm: HomeViewModel = viewModel(factory = HomeViewModelFactory(bestBuyRepo))
                 var productoSeleccionado by remember { mutableStateOf<ProductDto?>(null) }
+                val carritoVm: com.joel.proyecto2026.ui.viewmodel.CarritoViewModel = viewModel()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
                     when (currentScreen) {
-                        AppScreen.Loading -> Box(
+                        PantallaApp.Loading -> Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("Cargando...")
                         }
 
-                        AppScreen.Login -> LoginScreen(
+                        PantallaApp.Login -> PantallaInicioSesion(
                             vm = loginVm,
-                            onLoginSuccess = { currentScreen = AppScreen.Home },
-                            onRegisterClick = { currentScreen = AppScreen.Register }
+                            onLoginSuccess = { currentScreen = PantallaApp.Home },
+                            onRegisterClick = { currentScreen = PantallaApp.Register }
                         )
 
-                        AppScreen.Register -> RegisterScreen(
+                        PantallaApp.Register -> PantallaRegistro(
                             authRepository = authRepository,
-                            onBackToLogin = { currentScreen = AppScreen.Login },
+                            onBackToLogin = { currentScreen = PantallaApp.Login },
                             onRegisterSuccess = { registeredEmail ->
                                 // prefill email and go to Home
                                 loginVm.onEmailChange(registeredEmail)
-                                currentScreen = AppScreen.Home
+                                currentScreen = PantallaApp.Home
                             }
                         )
 
-                        AppScreen.Home -> {
-                            HomeScreen(
-                                userName = authRepository.getLoggedUserName(),
-                                homeViewModel = homeVm,
-                                onOpenInventory = { currentScreen = AppScreen.Inventory },
-                                onOpenProviders = { currentScreen = AppScreen.Providers },
-                                onOpenSettings = { currentScreen = AppScreen.Settings },
-                                onProductClick = { productoSeleccionado = it },
-                                onProfileClick = { currentScreen = AppScreen.Profile }
-                            )
+                        PantallaApp.Home -> {
+                                PantallaInicio(
+                                    userName = authRepository.getLoggedUserName(),
+                                    homeViewModel = homeVm,
+                                    onOpenInventory = { currentScreen = PantallaApp.Inventory },
+                                    onOpenProviders = { currentScreen = PantallaApp.Providers },
+                                    onOpenSettings = { currentScreen = PantallaApp.Settings },
+                                    cantidadCarrito = carritoVm.totalArticulos(),
+                                    onAbrirCarrito = { currentScreen = PantallaApp.Checkout },
+                                    onProductClick = { productoSeleccionado = it },
+                                    onProfileClick = { currentScreen = PantallaApp.Profile }
+                                )
                         }
 
-                        AppScreen.Inventory -> {
-                            InventoryScreen(
-                                onBackToHome = { currentScreen = AppScreen.Home },
+                        PantallaApp.Inventory -> {
+                            PantallaInventario(
+                                onBackToHome = { currentScreen = PantallaApp.Home },
                                 homeViewModel = homeVm,
                                 onProductoClick = { productoSeleccionado = it }
                             )
                         }
 
-                        AppScreen.Providers -> {
-                            ProvidersScreen(
+                        PantallaApp.Providers -> {
+                            PantallaProveedores(
                                 homeViewModel = homeVm,
-                                onBack = { currentScreen = AppScreen.Home }
+                                onBack = { currentScreen = PantallaApp.Home }
                             )
                         }
 
-                        AppScreen.Profile -> {
-                            ProfileScreen(onBack = { currentScreen = AppScreen.Home })
+                        PantallaApp.Profile -> {
+                            PantallaPerfil(
+                                onBack = { currentScreen = PantallaApp.Home },
+                                onLogout = {
+                                    // prefer using the LoginViewModel helper
+                                    loginVm.logout()
+                                    // clear any home view model cached data
+                                    homeVm.categories.clear()
+                                    homeVm.featured.clear()
+                                    currentScreen = PantallaApp.Login
+                                }
+                            )
                         }
 
-                        AppScreen.Settings -> {
-                            SettingsScreen(onBack = { currentScreen = AppScreen.Home })
+                        PantallaApp.Settings -> {
+                            PantallaConfiguracion(
+                                onBack = { currentScreen = PantallaApp.Home },
+                                onLogout = {
+                                    loginVm.logout()
+                                    homeVm.categories.clear()
+                                    homeVm.featured.clear()
+                                    currentScreen = PantallaApp.Login
+                                }
+                            )
+                        }
+                        PantallaApp.Checkout -> {
+                            PantallaPago(
+                                carritoViewModel = carritoVm,
+                                onBack = { currentScreen = PantallaApp.Home }
+                            )
                         }
                     }
 
-                    productoSeleccionado?.let { product ->
-                        ProductDetailDialog(
-                            product = product,
-                            onDismiss = { productoSeleccionado = null }
+                    productoSeleccionado?.let { producto ->
+                        DialogoDetalleProducto(
+                            producto = producto,
+                            onDismiss = { productoSeleccionado = null },
+                            onAgregarAlCarrito = { p, q -> carritoVm.agregarAlCarrito(p, q) },
+                            onComprarAhora = { p, q ->
+                                carritoVm.agregarAlCarrito(p, q)
+                                productoSeleccionado = null
+                                currentScreen = PantallaApp.Checkout
+                            }
                         )
                     }
                 }

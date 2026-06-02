@@ -159,7 +159,7 @@ private fun getFakeStock(product: ProductDto): Int {
 }
 
 @Composable
-fun ProvidersScreen(
+fun PantallaProveedores(
     homeViewModel: HomeViewModel? = null,
     onBack: (() -> Unit)? = null
 ) {
@@ -793,7 +793,7 @@ private fun EmptySearchResult() {
 
 @Preview(showBackground = true)
 @Composable
-private fun ProvidersScreenPreview() {
+private fun VistaPreviaPantallaProveedores() {
     val sample = listOf(
         ProviderUi("Distribuidor A", emptyList(), Color(0xFF4DA3FF)),
         ProviderUi("Distribuidor B", emptyList(), Color(0xFF38D996)),

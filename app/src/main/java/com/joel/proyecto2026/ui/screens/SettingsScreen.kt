@@ -63,8 +63,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Settings
 
 @Composable
-fun SettingsScreen(
-    onBack: (() -> Unit)? = null
+fun PantallaConfiguracion(
+    onBack: (() -> Unit)? = null,
+    onLogout: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier
@@ -221,6 +222,17 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Logout button
+            OutlinedButton(
+                onClick = { onLogout?.invoke() },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "Cerrar sesión", color = Color(0xFFFF6B6B))
+            }
         }
     }
 }
@@ -247,8 +259,8 @@ private fun SettingRow(label: String, icon: androidx.compose.ui.graphics.vector.
 
 @Preview(showBackground = true)
 @Composable
-private fun SettingsScreenPreview() {
-    SettingsScreen(onBack = {})
+private fun VistaPreviaPantallaConfiguracion() {
+    PantallaConfiguracion(onBack = {})
 }
 
 @Composable

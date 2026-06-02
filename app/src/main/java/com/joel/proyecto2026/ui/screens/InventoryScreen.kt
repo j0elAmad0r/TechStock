@@ -62,7 +62,7 @@ import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
 import androidx.compose.runtime.LaunchedEffect
 
 @Composable
-fun InventoryScreen(
+fun PantallaInventario(
     onBackToHome: () -> Unit,
     homeViewModel: HomeViewModel,
     onProductoClick: (ProductDto) -> Unit = {}
@@ -83,7 +83,7 @@ fun InventoryScreen(
             .sortedBy { it.title.orEmpty() }
     }
 
-    // Disparar búsqueda remota cuando cambia la consulta (comportamiento simple)
+    // Disparar busqueda remota cuando cambia la consulta (comportamiento simple)
     LaunchedEffect(query) {
         // si la consulta está vacía se podría omitir la llamada; aquí la ejecutamos siempre
         homeViewModel.search(query.ifEmpty { "" })
@@ -473,7 +473,7 @@ private fun ProductListItem(
                 Spacer(modifier = Modifier.height(5.dp))
 
                 Text(
-                    text = "Provedor: ${product.source ?: "Categoría"} • SKU: ${generateSku(product)}",
+                    text = "Provedor: ${product.source ?: "Categoria"} • SKU: ${generateSku(product)}",
                     color = Color.White.copy(alpha = 0.62f),
                     fontSize = 12.sp,
                     maxLines = 1,

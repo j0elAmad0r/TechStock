@@ -45,7 +45,7 @@ import androidx.compose.ui.res.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(
+fun PantallaInicioSesion(
     vm: LoginViewModel,
     onLoginSuccess: () -> Unit = {},
     onRegisterClick: () -> Unit = {}
@@ -134,7 +134,7 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                "Gestión de Inventario Tecnológico",
+                "Gestion de Inventario Tecnologico",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground
             )

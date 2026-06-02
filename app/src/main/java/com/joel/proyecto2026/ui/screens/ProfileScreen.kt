@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,7 @@ import com.joel.proyecto2026.ui.theme.PrimaryLight
 import com.joel.proyecto2026.ui.theme.PrimaryLight2
 
 @Composable
-fun ProfileScreen(
+fun PantallaPerfil(
     name: String = "Joel",
     email: String = "joel.@example.com",
     role: String = "Administrador",
@@ -57,7 +58,8 @@ fun ProfileScreen(
     requestsHandled: Int = 24,
     lastAccessLabel: String = "Hoy",
     onBack: (() -> Unit)? = null,
-    onRoleSelected: ((String) -> Unit)? = null
+    onRoleSelected: ((String) -> Unit)? = null,
+    onLogout: (() -> Unit)? = null
 ) {
     val roles = listOf(
         RoleUi("Administrador", Icons.Filled.Shield),
@@ -191,6 +193,16 @@ fun ProfileScreen(
                     InfoRow(label = "Miembro desde", value = memberSince)
                     InfoRow(label = "Rol actual", value = selectedRole.value)
                     InfoRow(label = "Correo", value = email)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { onLogout?.invoke() },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = "Cerrar sesión", color = Color(0xFFFF6B6B))
+                    }
                 }
             }
         }
@@ -312,8 +324,8 @@ private fun InfoRow(label: String, value: String) {
 
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
-private fun ProfileScreenPreview() {
-    ProfileScreen()
+private fun VistaPreviaPantallaPerfil() {
+    PantallaPerfil()
 }
 
 private data class RoleUi(

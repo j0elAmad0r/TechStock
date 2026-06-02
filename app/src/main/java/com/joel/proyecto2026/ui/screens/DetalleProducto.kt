@@ -1,4 +1,5 @@
 package com.joel.proyecto2026.ui.screens
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -6,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 // import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,14 +17,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Icon
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.IconButton
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,11 +32,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
-fun DialogoDetalleProducto(
-    producto: ProductDto,
-    onDismiss: () -> Unit,
-    onAgregarAlCarrito: ((ProductDto, Int) -> Unit)? = null,
-    onComprarAhora: ((ProductDto, Int) -> Unit)? = null
+fun DetalleProducto(
+    product: ProductDto,
+    onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -55,7 +45,7 @@ fun DialogoDetalleProducto(
             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = producto.title ?: "Detalle",
+                        text = product.title ?: "Detalle",
                         color = Color.White,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -66,10 +56,10 @@ fun DialogoDetalleProducto(
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                if (!producto.thumbnail.isNullOrBlank()) {
+                if (!product.thumbnail.isNullOrBlank()) {
                     AsyncImage(
-                        model = producto.thumbnail,
-                        contentDescription = producto.title,
+                        model = product.thumbnail,
+                        contentDescription = product.title,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
@@ -80,8 +70,8 @@ fun DialogoDetalleProducto(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = when {
-                        !producto.price.isNullOrBlank() -> producto.price ?: "-"
-                        producto.extractedPrice != null -> "$${"%.2f".format(producto.extractedPrice)}"
+                        !product.price.isNullOrBlank() -> product.price ?: "-"
+                        product.extractedPrice != null -> "$${"%.2f".format(product.extractedPrice)}"
                         else -> "-"
                     },
                     color = Color(0xFF4DA3FF),
@@ -90,69 +80,29 @@ fun DialogoDetalleProducto(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = producto.source ?: "",
+                    text = product.source ?: "",
                     color = Color.White.copy(alpha = 0.72f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (producto.rating != null || producto.reviews != null) {
+                if (product.rating != null || product.reviews != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    val stockText = producto.reviews?.let { "Stock: ${it / 10} unidades" } ?: "Stock: -"
+                    val stockText = product.reviews?.let { "Stock: ${it / 10} unidades" } ?: "Stock: -"
                     Text(
-                        text = "Valoracion: ${producto.rating ?: "-"} · $stockText",
+                        text = "Valoracion: ${product.rating ?: "-"} · $stockText",
                         color = Color.White.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-
-                
-                val cantidad = remember { mutableStateOf(1) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { if (cantidad.value > 1) cantidad.value = cantidad.value - 1 }) {
-                        Icon(Icons.Filled.Remove, contentDescription = "Menos")
-                    }
-                    Text(text = cantidad.value.toString(), color = Color.White, modifier = Modifier.width(32.dp), style = MaterialTheme.typography.titleMedium)
-                    IconButton(onClick = { cantidad.value = cantidad.value + 1 }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Más")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(modifier = Modifier.weight(1f), onClick = {
-                        onAgregarAlCarrito?.invoke(producto, cantidad.value)
-                        onDismiss()
-                    }) {
-                        Text(text = "Agregar al carrito")
-                    }
-
-                    Button(modifier = Modifier.weight(1f), onClick = {
-                        // comportamiento por defecto: agregar al carrito y navegar al checkout
-                        onComprarAhora?.invoke(producto, cantidad.value)
-                        onDismiss()
-                    }) {
-                        Text(text = "Comprar ahora")
-                    }
-                }
+                Text(
+                    text = "Cerrar",
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .clickable { onDismiss() }
+                        .padding(vertical = 8.dp)
+                )
             }
         }
     }
-}
-
- // Ejemplo
-@Preview(showBackground = true)
-@Composable
-fun DialogoDetalleProductoPreview() {
-    val sample = ProductDto(
-        title = "Cafetera",
-        thumbnail = "https://via.placeholder.com/600x400.png?text=Producto",
-        price = "$29.99",
-        extractedPrice = 29.99,
-        source = "Tienda Demo",
-        rating = 4.5,
-        reviews = 120
-    )
-    DialogoDetalleProducto(producto = sample, onDismiss = {})
 }

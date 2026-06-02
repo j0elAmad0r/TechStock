@@ -52,7 +52,7 @@ import com.joel.proyecto2026.ui.theme.PrimaryLight
 import com.joel.proyecto2026.ui.theme.PrimaryLight2
 
 @Composable
-fun RegisterScreen(
+fun PantallaRegistro(
 	authRepository: AuthRepository,
 	onBackToLogin: () -> Unit = {},
 	onRegisterSuccess: (String) -> Unit = {}
@@ -177,7 +177,7 @@ fun RegisterScreen(
 							email = it
 							errorMessage = null
 						},
-						label = { Text("Correo Electrónico") },
+						label = { Text("Correo Electronico") },
 						leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
 						singleLine = true,
 						modifier = Modifier.fillMaxWidth()
