@@ -45,6 +45,8 @@ private enum class PantallaApp {
     Checkout
 }
 
+//Kaktuz estuvo aqui
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
