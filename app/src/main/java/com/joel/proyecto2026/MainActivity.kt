@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -72,32 +73,34 @@ class MainActivity : ComponentActivity() {
                 var productoSeleccionado by remember { mutableStateOf<ProductDto?>(null) }
                 val carritoVm: com.joel.proyecto2026.ui.viewmodel.CarritoViewModel = viewModel()
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
-                    when (currentScreen) {
-                        PantallaApp.Loading -> Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Cargando...")
-                        }
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    // Envolvemos todo en una Box que respete el padding del Scaffold
+                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
 
-                        PantallaApp.Login -> PantallaInicioSesion(
-                            vm = loginVm,
-                            onLoginSuccess = { currentScreen = PantallaApp.Home },
-                            onRegisterClick = { currentScreen = PantallaApp.Register }
-                        )
-
-                        PantallaApp.Register -> PantallaRegistro(
-                            authRepository = authRepository,
-                            onBackToLogin = { currentScreen = PantallaApp.Login },
-                            onRegisterSuccess = { registeredEmail ->
-                                // prefill email and go to Home
-                                loginVm.onEmailChange(registeredEmail)
-                                currentScreen = PantallaApp.Home
+                        when (currentScreen) {
+                            PantallaApp.Loading -> Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Cargando...")
                             }
-                        )
 
-                        PantallaApp.Home -> {
+                            PantallaApp.Login -> PantallaInicioSesion(
+                                vm = loginVm,
+                                onLoginSuccess = { currentScreen = PantallaApp.Home },
+                                onRegisterClick = { currentScreen = PantallaApp.Register }
+                            )
+
+                            PantallaApp.Register -> PantallaRegistro(
+                                authRepository = authRepository,
+                                onBackToLogin = { currentScreen = PantallaApp.Login },
+                                onRegisterSuccess = { registeredEmail ->
+                                    loginVm.onEmailChange(registeredEmail)
+                                    currentScreen = PantallaApp.Home
+                                }
+                            )
+
+                            PantallaApp.Home -> {
                                 PantallaInicio(
                                     userName = authRepository.getLoggedUserName(),
                                     homeViewModel = homeVm,
@@ -109,70 +112,70 @@ class MainActivity : ComponentActivity() {
                                     onProductClick = { productoSeleccionado = it },
                                     onProfileClick = { currentScreen = PantallaApp.Profile }
                                 )
-                        }
-
-                        PantallaApp.Inventory -> {
-                            PantallaInventario(
-                                onBackToHome = { currentScreen = PantallaApp.Home },
-                                homeViewModel = homeVm,
-                                onProductoClick = { productoSeleccionado = it }
-                            )
-                        }
-
-                        PantallaApp.Providers -> {
-                            PantallaProveedores(
-                                homeViewModel = homeVm,
-                                onBack = { currentScreen = PantallaApp.Home }
-                            )
-                        }
-
-                        PantallaApp.Profile -> {
-                            PantallaPerfil(
-                                onBack = { currentScreen = PantallaApp.Home },
-                                onLogout = {
-                                    // prefer using the LoginViewModel helper
-                                    loginVm.logout()
-                                    // clear any home view model cached data
-                                    homeVm.categories.clear()
-                                    homeVm.featured.clear()
-                                    currentScreen = PantallaApp.Login
-                                }
-                            )
-                        }
-
-                        PantallaApp.Settings -> {
-                            PantallaConfiguracion(
-                                onBack = { currentScreen = PantallaApp.Home },
-                                onLogout = {
-                                    loginVm.logout()
-                                    homeVm.categories.clear()
-                                    homeVm.featured.clear()
-                                    currentScreen = PantallaApp.Login
-                                }
-                            )
-                        }
-                        PantallaApp.Checkout -> {
-                            CarritoVentasScreen(
-                                carritoViewModel = carritoVm,
-                                homeViewModel = homeVm,
-                                onBack = { currentScreen = PantallaApp.Home },
-                                onFinalizarVenta = { currentScreen = PantallaApp.Home },
-                                onProductClick = { productoSeleccionado = it }
-                            )
-                        }
-                    }
-
-                    productoSeleccionado?.let { producto ->
-                        DialogoDetalleProducto(
-                            producto = producto,
-                            onDismiss = { productoSeleccionado = null },
-                            onAgregarAlCarrito = { p, q -> carritoVm.agregarAlCarrito(p, q) },
-                            onComprarAhora = { p, q ->
-                                carritoVm.agregarAlCarrito(p, q)
-                                productoSeleccionado = null
-                                currentScreen = PantallaApp.Checkout
                             }
-                        )
+
+                            PantallaApp.Inventory -> {
+                                PantallaInventario(
+                                    onBackToHome = { currentScreen = PantallaApp.Home },
+                                    homeViewModel = homeVm,
+                                    onProductoClick = { productoSeleccionado = it }
+                                )
+                            }
+
+                            PantallaApp.Providers -> {
+                                PantallaProveedores(
+                                    homeViewModel = homeVm,
+                                    onBack = { currentScreen = PantallaApp.Home }
+                                )
+                            }
+
+                            PantallaApp.Profile -> {
+                                PantallaPerfil(
+                                    onBack = { currentScreen = PantallaApp.Home },
+                                    onLogout = {
+                                        loginVm.logout()
+                                        homeVm.categories.clear()
+                                        homeVm.featured.clear()
+                                        currentScreen = PantallaApp.Login
+                                    }
+                                )
+                            }
+
+                            PantallaApp.Settings -> {
+                                PantallaConfiguracion(
+                                    onBack = { currentScreen = PantallaApp.Home },
+                                    onLogout = {
+                                        loginVm.logout()
+                                        homeVm.categories.clear()
+                                        homeVm.featured.clear()
+                                        currentScreen = PantallaApp.Login
+                                    }
+                                )
+                            }
+
+                            PantallaApp.Checkout -> {
+                                CarritoVentasScreen(
+                                    carritoViewModel = carritoVm,
+                                    homeViewModel = homeVm,
+                                    onBack = { currentScreen = PantallaApp.Home },
+                                    onFinalizarVenta = { currentScreen = PantallaApp.Home },
+                                    onProductClick = { productoSeleccionado = it }
+                                )
+                            }
+                        }
+
+                        productoSeleccionado?.let { producto ->
+                            DialogoDetalleProducto(
+                                producto = producto,
+                                onDismiss = { productoSeleccionado = null },
+                                onAgregarAlCarrito = { p, q -> carritoVm.agregarAlCarrito(p, q) },
+                                onComprarAhora = { p, q ->
+                                    carritoVm.agregarAlCarrito(p, q)
+                                    productoSeleccionado = null
+                                    currentScreen = PantallaApp.Checkout
+                                }
+                            )
+                        }
                     }
                 }
             }

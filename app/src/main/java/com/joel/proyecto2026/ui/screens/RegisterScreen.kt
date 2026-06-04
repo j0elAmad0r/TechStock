@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -50,6 +51,7 @@ import com.joel.proyecto2026.repository.AuthRepository
 import com.joel.proyecto2026.models.LoginCredentials
 import com.joel.proyecto2026.ui.theme.PrimaryLight
 import com.joel.proyecto2026.ui.theme.PrimaryLight2
+import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaRegistro(
@@ -66,6 +68,8 @@ fun PantallaRegistro(
 	var isLoading by remember { mutableStateOf(false) }
 	var errorMessage by remember { mutableStateOf<String?>(null) }
 	var isRegistered by remember { mutableStateOf(false) }
+
+	val coroutineScope = rememberCoroutineScope()
 
 	if (isRegistered) {
 		LaunchedEffect(Unit) { onRegisterSuccess(email.trim()) }
@@ -263,25 +267,27 @@ fun PantallaRegistro(
 									else -> {
 										isLoading = true
 										errorMessage = null
-										val saved = authRepository.register(
-											fullName = fullName,
-											email = email.trim(),
-											password = password
-										)
 
-										if (!saved) {
-											errorMessage = "No se pudo guardar el registro"
-											isLoading = false
-										} else {
-											// intentar auto-login inmediatamente
-											val loggedIn = authRepository.login(
-												LoginCredentials(email = email.trim(), password = password, rememberMe = true)
+										coroutineScope.launch {
+											val saved = authRepository.register(
+												fullName = fullName,
+												email = email.trim(),
+												password = password
 											)
-											isLoading = false
-											if (loggedIn) {
-												onRegisterSuccess(email.trim())
+
+											if (!saved) {
+												errorMessage = "El correo ya existe o hubo un error"
+												isLoading = false
 											} else {
-												errorMessage = "Registro guardado pero no se pudo iniciar sesión automáticamente"
+												val loggedIn = authRepository.login(
+													LoginCredentials(email = email.trim(), password = password, rememberMe = true)
+												)
+												isLoading = false
+												if (loggedIn) {
+													onRegisterSuccess(email.trim())
+												} else {
+													errorMessage = "Registro guardado pero no se inició sesión automáticamente"
+												}
 											}
 										}
 									}
