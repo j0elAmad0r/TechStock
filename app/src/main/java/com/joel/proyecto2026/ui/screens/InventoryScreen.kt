@@ -28,10 +28,11 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,19 +69,29 @@ fun PantallaInventario(
     onProductoClick: (ProductDto) -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
+    var inventoryFilter by remember { mutableStateOf(InventoryFilter.All) }
 
     val products = homeViewModel.featured
 
-    val visibleProducts = remember(products, query) {
+    val visibleProducts = remember(products, query, inventoryFilter) {
         products
             .filter { product ->
                 val title = product.title.orEmpty()
                 val source = product.source.orEmpty()
-
-                title.contains(query, ignoreCase = true) ||
+                val matchesQuery = title.contains(query, ignoreCase = true) ||
                         source.contains(query, ignoreCase = true)
+                val stock = getFakeStock(product)
+                val matchesFilter = when (inventoryFilter) {
+                    InventoryFilter.All -> true
+                    InventoryFilter.LowStock -> stock < 10
+                    InventoryFilter.InStock -> stock >= 10
+                    InventoryFilter.LowPrice -> product.getPriceValue()?.let { it < 1000.0 } ?: false
+                    InventoryFilter.MediumPrice -> product.getPriceValue()?.let { it in 1000.0..5000.0 } ?: false
+                    InventoryFilter.HighPrice -> product.getPriceValue()?.let { it > 5000.0 } ?: false
+                }
+
+                matchesQuery && matchesFilter
             }
-            .sortedBy { it.title.orEmpty() }
     }
 
     // Disparar busqueda remota cuando cambia la consulta (comportamiento simple)
@@ -122,7 +133,9 @@ fun PantallaInventario(
                 item {
                     SearchAndActions(
                         query = query,
-                        onQueryChange = { query = it }
+                        selectedFilter = inventoryFilter,
+                        onQueryChange = { query = it },
+                        onFilterChange = { inventoryFilter = it }
                     )
                 }
 
@@ -222,8 +235,12 @@ private fun HeaderInventory(
 @Composable
 private fun SearchAndActions(
     query: String,
-    onQueryChange: (String) -> Unit
+    selectedFilter: InventoryFilter,
+    onQueryChange: (String) -> Unit,
+    onFilterChange: (InventoryFilter) -> Unit
 ) {
+    var showFilterMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -261,30 +278,52 @@ private fun SearchAndActions(
             )
         )
 
-        ActionMiniButton(
-            icon = Icons.Filled.FilterList,
-            text = "Filtrar"
-        )
+        Box {
+            ActionMiniButton(
+                icon = Icons.Filled.FilterList,
+                text = selectedFilter.label,
+                selected = selectedFilter != InventoryFilter.All,
+                onClick = { showFilterMenu = true }
+            )
 
-        ActionMiniButton(
-            icon = Icons.Filled.Sort,
-            text = "Ordenar"
-        )
+            DropdownMenu(
+                expanded = showFilterMenu,
+                onDismissRequest = { showFilterMenu = false },
+                modifier = Modifier.background(Color(0xFF07111D))
+            ) {
+                InventoryFilter.entries.forEach { filter ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = filter.label,
+                                color = Color.White
+                            )
+                        },
+                        onClick = {
+                            onFilterChange(filter)
+                            showFilterMenu = false
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun ActionMiniButton(
     icon: ImageVector,
-    text: String
+    text: String,
+    selected: Boolean = false,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
-            .width(74.dp)
+            .width(82.dp)
             .height(58.dp)
-            .clickable { },
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
+            containerColor = if (selected) PrimaryLight.copy(alpha = 0.22f) else Color(0xFF07111D)
         ),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -309,10 +348,20 @@ private fun ActionMiniButton(
                 text = text,
                 color = Color.White.copy(alpha = 0.9f),
                 fontSize = 11.sp,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
+}
+
+private enum class InventoryFilter(val label: String) {
+    All("Todos"),
+    LowStock("Bajo"),
+    InStock("En stock"),
+    LowPrice("< $1k"),
+    MediumPrice("$1k-$5k"),
+    HighPrice("+ $5k")
 }
 
 @Composable
@@ -482,12 +531,29 @@ private fun ProductListItem(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Stock: $stock",
-                    color = if (isLowStock) Color(0xFFFF8A00) else Color(0xFF3EDC81),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = product.price ?: "Sin precio",
+                        color = Color.White.copy(alpha = 0.86f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Text(
+                        text = "Stock: $stock",
+                        color = if (isLowStock) Color(0xFFFF8A00) else Color(0xFF3EDC81),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -572,6 +638,14 @@ private fun EmptyInventoryMessage() {
 
 private fun getFakeStock(product: ProductDto): Int {
     return ((product.reviews ?: 0) / 10).coerceAtLeast(1)
+}
+
+private fun ProductDto.getPriceValue(): Double? {
+    extractedPrice?.let { return it }
+
+    return price
+        ?.replace(Regex("[^0-9.]"), "")
+        ?.toDoubleOrNull()
 }
 
 private fun generateSku(product: ProductDto): String {

@@ -19,7 +19,7 @@ import com.joel.proyecto2026.ui.screens.PantallaInventario
 import com.joel.proyecto2026.ui.screens.PantallaProveedores
 import com.joel.proyecto2026.ui.screens.PantallaConfiguracion
 import com.joel.proyecto2026.ui.screens.DialogoDetalleProducto
-import com.joel.proyecto2026.ui.screens.PantallaPago
+import com.joel.proyecto2026.ui.screens.CarritoVentasScreen
 import com.joel.proyecto2026.repository.BestBuyRepositoryImpl
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModelFactory
@@ -150,9 +150,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         PantallaApp.Checkout -> {
-                            PantallaPago(
+                            CarritoVentasScreen(
                                 carritoViewModel = carritoVm,
-                                onBack = { currentScreen = PantallaApp.Home }
+                                homeViewModel = homeVm,
+                                onBack = { currentScreen = PantallaApp.Home },
+                                onFinalizarVenta = { currentScreen = PantallaApp.Home },
+                                onProductClick = { productoSeleccionado = it }
                             )
                         }
                     }

@@ -6,31 +6,107 @@ import com.joel.proyecto2026.network.ProductDto
 
 data class ItemCarrito(
     val producto: ProductDto,
-    var cantidad: Int = 1
+    val cantidad: Int = 1
 )
 
 class CarritoViewModel : ViewModel() {
+
     val articulos = mutableStateListOf<ItemCarrito>()
 
     fun agregarAlCarrito(producto: ProductDto, cantidad: Int = 1) {
-        val idx = articulos.indexOfFirst { it.producto.title == producto.title && it.producto.source == producto.source }
-        if (idx >= 0) {
-            val existente = articulos[idx]
-            existente.cantidad += cantidad
-            articulos[idx] = existente
+        val index = articulos.indexOfFirst {
+            it.producto.title == producto.title &&
+                    it.producto.source == producto.source
+        }
+
+        if (index >= 0) {
+            val itemActual = articulos[index]
+            articulos[index] = itemActual.copy(
+                cantidad = itemActual.cantidad + cantidad
+            )
         } else {
-            articulos.add(ItemCarrito(producto = producto, cantidad = cantidad))
+            articulos.add(
+                ItemCarrito(
+                    producto = producto,
+                    cantidad = cantidad
+                )
+            )
+        }
+    }
+
+    fun aumentarCantidad(producto: ProductDto) {
+        val index = articulos.indexOfFirst {
+            it.producto.title == producto.title &&
+                    it.producto.source == producto.source
+        }
+
+        if (index >= 0) {
+            val itemActual = articulos[index]
+            articulos[index] = itemActual.copy(
+                cantidad = itemActual.cantidad + 1
+            )
+        }
+    }
+
+    fun disminuirCantidad(producto: ProductDto) {
+        val index = articulos.indexOfFirst {
+            it.producto.title == producto.title &&
+                    it.producto.source == producto.source
+        }
+
+        if (index >= 0) {
+            val itemActual = articulos[index]
+
+            if (itemActual.cantidad <= 1) {
+                articulos.removeAt(index)
+            } else {
+                articulos[index] = itemActual.copy(
+                    cantidad = itemActual.cantidad - 1
+                )
+            }
         }
     }
 
     fun eliminarItem(producto: ProductDto) {
-        val idx = articulos.indexOfFirst { it.producto.title == producto.title && it.producto.source == producto.source }
-        if (idx >= 0) articulos.removeAt(idx)
+        val index = articulos.indexOfFirst {
+            it.producto.title == producto.title &&
+                    it.producto.source == producto.source
+        }
+
+        if (index >= 0) {
+            articulos.removeAt(index)
+        }
     }
 
     fun vaciar() {
         articulos.clear()
     }
 
-    fun totalArticulos(): Int = articulos.sumOf { it.cantidad }
+    fun totalArticulos(): Int {
+        return articulos.sumOf { it.cantidad }
+    }
+
+    fun subtotal(): Double {
+        return articulos.sumOf { item ->
+            obtenerPrecio(item.producto) * item.cantidad
+        }
+    }
+
+    fun iva(): Double {
+        return subtotal() * 0.16
+    }
+
+    fun total(): Double {
+        return subtotal() + iva()
+    }
+
+    private fun obtenerPrecio(producto: ProductDto): Double {
+        return producto.extractedPrice
+            ?: producto.price
+                ?.replace("$", "")
+                ?.replace(",", "")
+                ?.trim()
+                ?.toDoubleOrNull()
+            ?: 0.0
+    }
 }

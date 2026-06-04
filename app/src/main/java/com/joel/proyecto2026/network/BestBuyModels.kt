@@ -7,7 +7,8 @@ data class ProductDto(
     val thumbnail: String? = null,
     val rating: Double? = null,
     val reviews: Int? = null,
-    val source: String? = null
+    val source: String? = null,
+    val sourceIcon: String? = null
 )
 
 data class CategoryDto(

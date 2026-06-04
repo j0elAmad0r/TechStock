@@ -19,20 +19,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.joel.proyecto2026.R
 import com.joel.proyecto2026.ui.theme.PrimaryLight
@@ -62,11 +77,12 @@ fun PantallaPerfil(
     onLogout: (() -> Unit)? = null
 ) {
     val roles = listOf(
-        RoleUi("Administrador", Icons.Filled.Shield),
+        RoleUi("Administrador", Icons.Filled.AdminPanelSettings),
         RoleUi("Vendedor", Icons.Filled.ShoppingCart),
         RoleUi("Almacenista", Icons.Filled.Inventory2)
     )
-    val selectedRole = remember { mutableStateOf(role) }
+    var selectedRole by remember { mutableStateOf(role) }
+    var roleToValidate by remember { mutableStateOf<RoleUi?>(null) }
 
     Box(
         modifier = Modifier
@@ -146,10 +162,11 @@ fun PantallaPerfil(
                                 modifier = Modifier.weight(1f),
                                 label = r.label,
                                 icon = r.icon,
-                                selected = selectedRole.value == r.label,
+                                selected = selectedRole == r.label,
                                 onClick = {
-                                    selectedRole.value = r.label
-                                    onRoleSelected?.invoke(r.label)
+                                    if (selectedRole != r.label) {
+                                        roleToValidate = r
+                                    }
                                 }
                             )
                         }
@@ -165,21 +182,21 @@ fun PantallaPerfil(
                             modifier = Modifier.weight(1f),
                             title = "Productos",
                             value = productsCount.toString(),
-                            iconColor = Color(0xFF4DA3FF)
+                            icon = Icons.Filled.Inventory2
                         )
 
                         StatTile(
                             modifier = Modifier.weight(1f),
                             title = "Solicitudes",
                             value = requestsHandled.toString(),
-                            iconColor = Color(0xFF7C4DFF)
+                            icon = Icons.Filled.LocalShipping
                         )
 
                         StatTile(
                             modifier = Modifier.weight(1f),
                             title = "Último acceso",
                             value = lastAccessLabel,
-                            iconColor = Color(0xFF2ECC71)
+                            icon = Icons.Filled.AccessTime
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -190,9 +207,9 @@ fun PantallaPerfil(
                     Text(text = "Información de cuenta", color = Color.White, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    InfoRow(label = "Miembro desde", value = memberSince)
-                    InfoRow(label = "Rol actual", value = selectedRole.value)
-                    InfoRow(label = "Correo", value = email)
+                    InfoRow(icon = Icons.Filled.CalendarMonth, label = "Miembro desde", value = memberSince)
+                    InfoRow(icon = Icons.Filled.Badge, label = "Rol actual", value = selectedRole)
+                    InfoRow(icon = Icons.Filled.Email, label = "Correo", value = email)
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -201,10 +218,29 @@ fun PantallaPerfil(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Logout,
+                            contentDescription = null,
+                            tint = Color(0xFFFF6B6B),
+                            modifier = Modifier.size(19.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(text = "Cerrar sesión", color = Color(0xFFFF6B6B))
                     }
                 }
             }
+        }
+
+        roleToValidate?.let { targetRole ->
+            RolePasswordDialog(
+                role = targetRole,
+                onDismiss = { roleToValidate = null },
+                onValidated = {
+                    selectedRole = targetRole.label
+                    onRoleSelected?.invoke(targetRole.label)
+                    roleToValidate = null
+                }
+            )
         }
     }
 }
@@ -261,7 +297,7 @@ private fun StatTile(
     modifier: Modifier = Modifier,
     title: String,
     value: String,
-    iconColor: Color
+    icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
     Card(
         modifier = modifier.height(130.dp),
@@ -278,14 +314,14 @@ private fun StatTile(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = 0.16f)),
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.logo),
+                    imageVector = icon,
                     contentDescription = null,
-                    tint = iconColor,
+                    tint = PrimaryLight,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -315,10 +351,159 @@ private fun StatTile(
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(text = label, color = Color.White.copy(alpha = 0.72f))
-        Text(text = value, color = Color.White.copy(alpha = 0.92f), fontWeight = FontWeight.SemiBold)
+private fun InfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White.copy(alpha = 0.07f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = PrimaryLight,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(text = label, color = Color.White.copy(alpha = 0.72f), maxLines = 1)
+        }
+
+        Text(
+            text = value,
+            color = Color.White.copy(alpha = 0.92f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun RolePasswordDialog(
+    role: RoleUi,
+    onDismiss: () -> Unit,
+    onValidated: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val expectedPassword = passwordForRole(role.label)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF071226)),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(PrimaryLight.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = PrimaryLight,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Validar rol",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = role.label,
+                            color = Color.White.copy(alpha = 0.64f),
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color.White.copy(alpha = 0.72f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        error = false
+                    },
+                    singleLine = true,
+                    isError = error,
+                    label = { Text("Contraseña del rol") },
+                    supportingText = {
+                        if (error) {
+                            Text("Contraseña incorrecta")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = PrimaryLight,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.18f),
+                        focusedLabelColor = PrimaryLight,
+                        unfocusedLabelColor = Color.White.copy(alpha = 0.58f),
+                        errorTextColor = Color.White,
+                        errorBorderColor = Color(0xFFFF6B6B),
+                        errorLabelColor = Color(0xFFFF6B6B)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        if (password.trim() == expectedPassword) {
+                            onValidated()
+                        } else {
+                            error = true
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryLight)
+                ) {
+                    Text(
+                        text = "Cambiar a ${role.label}",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -332,3 +517,13 @@ private data class RoleUi(
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
+
+// validacion basica de contraseñas para cada rol
+private fun passwordForRole(role: String): String {
+    return when (role) {
+        "Administrador" -> "admin"
+        "Vendedor" -> "venta"
+        "Almacenista" -> "almacen"
+        else -> ""
+    }
+}

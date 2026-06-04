@@ -3,6 +3,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,7 +81,8 @@ private data class FeaturedItem(
     val stockLabel: String,
     val accent: Color,
     val badge: String,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val product: ProductDto? = null
 )
 
 @DrawableRes
@@ -144,7 +146,8 @@ fun PantallaInicio(
                 stockLabel = p.reviews?.let { "${it} reseñas" } ?: (p.source ?: "-"),
                 accent = colors[idx % colors.size],
                 badge = (p.source ?: p.title ?: "#").take(3).uppercase(),
-                imageUrl = p.thumbnail
+                imageUrl = p.thumbnail,
+                product = p
             )
         }
     } else {
@@ -160,6 +163,7 @@ fun PantallaInicio(
         Triple("Inicio", Icons.Filled.Home, true),
         Triple("Proveedor", Icons.Filled.Category, false),
         Triple("Inventario", Icons.Filled.Inventory, false),
+        Triple("Carrito", Icons.Filled.ShoppingCart, false),
         Triple("Perfil", Icons.Filled.Person, false)
     )
 
@@ -422,7 +426,9 @@ fun PantallaInicio(
                     ) {
                         featuredItems.forEach { item ->
                             Card(
-                                modifier = Modifier.size(width = 148.dp, height = 210.dp),
+                                modifier = Modifier
+                                    .size(width = 148.dp, height = 210.dp)
+                                    .clickable { item.product?.let { onProductClick?.invoke(it) } },
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
                                 shape = RoundedCornerShape(18.dp)
                             ) {
@@ -599,6 +605,7 @@ fun PantallaInicio(
                                                     "Proveedor" -> onOpenProviders?.invoke()
                                                     "Inventario" -> onOpenInventory?.invoke()
                                                     "Perfil" -> onProfileClick?.invoke()
+                                                    "Carrito" -> onAbrirCarrito?.invoke()
                                                     else -> { /* no-op */ }
                                                 }
                                             },

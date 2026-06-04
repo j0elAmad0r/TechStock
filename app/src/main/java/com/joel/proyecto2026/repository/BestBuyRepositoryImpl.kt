@@ -1,5 +1,4 @@
 package com.joel.proyecto2026.repository
-
 import com.joel.proyecto2026.network.CategoryDto
 import com.joel.proyecto2026.network.ProductDto
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +75,8 @@ class BestBuyRepositoryImpl(private val apiKey: String) : BestBuyRepository {
                                     thumbnail = item.optString("thumbnail").ifBlank { item.optString("image") },
                                     rating = item.optDouble("rating", Double.NaN).takeIf { !it.isNaN() },
                                     reviews = item.optInt("reviews", -1).takeIf { it >= 0 },
-                                    source = item.optString("source")
+                                    source = item.optString("source"),
+                                    sourceIcon = item.optString("source_icon").ifBlank { item.optString("source_logo") }
                                 )
                             )
                         }
