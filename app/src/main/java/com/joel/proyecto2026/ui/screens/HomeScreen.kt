@@ -1,9 +1,9 @@
 package com.joel.proyecto2026.ui.screens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,7 +63,12 @@ import androidx.annotation.DrawableRes
 import coil.compose.AsyncImage
 import com.joel.proyecto2026.R
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
-import com.joel.proyecto2026.network.CategoryDto
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import androidx.compose.runtime.LaunchedEffect
 import com.joel.proyecto2026.network.ProductDto
 import com.joel.proyecto2026.ui.theme.PrimaryLight
 import com.joel.proyecto2026.ui.theme.PrimaryLight2
@@ -103,7 +108,8 @@ private fun iconoCategoriaRes(titulo: String): Int {
 @Composable
 fun PantallaInicio(
     userName: String?,
-    homeViewModel: HomeViewModel? = null,
+    userRole: String? = null,
+    homeViewModel: HomeViewModel? = null, // Ya casi no lo usaremos aquí, pero lo mantenemos para no romper la app
     onOpenInventory: (() -> Unit)? = null,
     onOpenProviders: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
@@ -114,28 +120,45 @@ fun PantallaInicio(
 ) {
     val colors = listOf(Color(0xFF4DA3FF), Color(0xFF38D996), Color(0xFFFFA64D), Color(0xFF5DB8FF), Color(0xFF7EC8FF))
 
-    val categories = if (homeViewModel != null && homeViewModel.categories.isNotEmpty()) {
-        homeViewModel.categories.mapIndexed { idx, c ->
-            CategoryItem(
-                title = c.name ?: c.query ?: "Categoría",
-                badge = (c.name ?: c.query ?: "CAT").take(3).uppercase(),
-                accent = colors[idx % colors.size]
-            )
-        }
-    } else {
-        listOf(
-            CategoryItem("Procesadores", "CPU", Color(0xFF4DA3FF)),
-            CategoryItem("Memorias", "RAM", Color(0xFF38D996)),
-            CategoryItem("Tarjetas", "GPU", Color(0xFFFFA64D)),
-            CategoryItem("Placa Madre", "MB", Color(0xFF5DB8FF)),
-            CategoryItem("Almacenamiento", "SSD", Color(0xFF7EC8FF)),
-            CategoryItem("Periféricos", "PER", Color(0xFF4DA3FF)),
-            CategoryItem("Gabinete", "Gabo", Color(0xFF38D996))
-        )
+    var productosLocales by remember { mutableStateOf<List<ProductDto>>(emptyList()) }
+    var cargandoCatalogo by remember { mutableStateOf(true) }
+    var search by remember { mutableStateOf("") }
+    var showProductsDialog by remember { mutableStateOf(false) }
+    var selectedCategoryTitle by remember { mutableStateOf("") }
+    val scrollState = rememberScrollState()
+
+    // 1. CARGAMOS LA BASE DE DATOS
+    LaunchedEffect(Unit) {
+        productosLocales = obtenerCatalogoDeBD()
+        cargandoCatalogo = false
     }
 
-    val featuredItems = if (homeViewModel != null && homeViewModel.featured.isNotEmpty()) {
-        homeViewModel.featured.mapIndexed { idx, p ->
+    val safeRole = userRole?.trim()?.lowercase() ?: ""
+    val isAdmin = safeRole == "1" || safeRole.contains("administrador")
+
+    // 2. FILTRADO INSTANTÁNEO LOCAL (Ya no usamos la API para buscar)
+    val productosFiltrados = if (search.isBlank()) {
+        productosLocales
+    } else {
+        productosLocales.filter {
+            it.title?.contains(search, ignoreCase = true) == true ||
+                    it.source?.contains(search, ignoreCase = true) == true
+        }
+    }
+
+    val categories = listOf(
+        CategoryItem("Procesadores", "CPU", Color(0xFF4DA3FF)),
+        CategoryItem("Memorias", "RAM", Color(0xFF38D996)),
+        CategoryItem("Tarjetas Gráficas", "GPU", Color(0xFFFFA64D)),
+        CategoryItem("Placa Madre", "MB", Color(0xFF5DB8FF)),
+        CategoryItem("Almacenamiento", "SSD", Color(0xFF7EC8FF)),
+        CategoryItem("Periféricos", "PER", Color(0xFF4DA3FF)),
+        CategoryItem("Gabinete", "Gabo", Color(0xFF38D996))
+    )
+
+    // 3. CONVERTIMOS LOS PRODUCTOS DE MYSQL A TARJETAS
+    val featuredItems = if (productosFiltrados.isNotEmpty()) {
+        productosFiltrados.mapIndexed { idx, p ->
             FeaturedItem(
                 name = p.title ?: "-",
                 price = when {
@@ -143,7 +166,7 @@ fun PantallaInicio(
                     p.extractedPrice != null -> "$${"%.2f".format(p.extractedPrice)}"
                     else -> "-"
                 },
-                stockLabel = p.reviews?.let { "${it} reseñas" } ?: (p.source ?: "-"),
+                stockLabel = p.reviews?.let { "En stock: ${it / 10}" } ?: "Sin stock",
                 accent = colors[idx % colors.size],
                 badge = (p.source ?: p.title ?: "#").take(3).uppercase(),
                 imageUrl = p.thumbnail,
@@ -151,26 +174,20 @@ fun PantallaInicio(
             )
         }
     } else {
-        listOf(
-            FeaturedItem("AMD Ryzen 5 5600X", "$159.99", "En stock: 24", Color(0xFF4DA3FF), "R5"),
-            FeaturedItem("Corsair Vengeance 16GB DDR4", "$49.99", "En stock: 38", Color(0xFF38D996), "16G"),
-            FeaturedItem("MSI GeForce RTX 3060", "$329.99", "En stock: 12", Color(0xFFFFA64D), "RTX"),
-            FeaturedItem("Sensor DHT22", "$8.99", "En stock: 56", Color(0xFF7EC8FF), "D22")
-        )
+        emptyList()
     }
 
-    val bottomItems = listOf(
-        Triple("Inicio", Icons.Filled.Home, true),
-        Triple("Proveedor", Icons.Filled.Category, false),
-        Triple("Inventario", Icons.Filled.Inventory, false),
-        Triple("Carrito", Icons.Filled.ShoppingCart, false),
-        Triple("Perfil", Icons.Filled.Person, false)
+    val bottomItems = mutableListOf(
+        Triple("Inicio", Icons.Filled.Home, true)
     )
 
-    var search by remember { mutableStateOf("") }
-    var showProductsDialog by remember { mutableStateOf(false) }
-    var selectedCategoryTitle by remember { mutableStateOf("") }
-    val scrollState = rememberScrollState()
+    if (isAdmin) {
+        bottomItems.add(Triple("Proveedor", Icons.Filled.Category, false))
+        bottomItems.add(Triple("Inventario", Icons.Filled.Inventory, false))
+    }
+
+    bottomItems.add(Triple("Carrito", Icons.Filled.ShoppingCart, false))
+    bottomItems.add(Triple("Perfil", Icons.Filled.Person, false))
 
     Box(
         modifier = Modifier
@@ -186,29 +203,9 @@ fun PantallaInicio(
             ),
         contentAlignment = Alignment.TopCenter
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(180.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(PrimaryLight.copy(alpha = 0.22f), Color.Transparent)
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .size(220.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(PrimaryLight2.copy(alpha = 0.18f), Color.Transparent)
-                    ),
-                    shape = CircleShape
-                )
-        )
+        // ... (Círculos de fondo decorativos) ...
+        Box(modifier = Modifier.align(Alignment.TopEnd).size(180.dp).background(Brush.radialGradient(colors = listOf(PrimaryLight.copy(alpha = 0.22f), Color.Transparent)), shape = CircleShape))
+        Box(modifier = Modifier.align(Alignment.TopStart).size(220.dp).background(Brush.radialGradient(colors = listOf(PrimaryLight2.copy(alpha = 0.18f), Color.Transparent)), shape = CircleShape))
 
         Column(
             modifier = Modifier
@@ -300,30 +297,19 @@ fun PantallaInicio(
                             value = search,
                             onValueChange = { search = it },
                             singleLine = true,
-                            placeholder = { Text("Buscar componentes") },
+                            placeholder = { Text("Buscar en el inventario local") },
                             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = { homeViewModel?.search(search.ifBlank { "Procesadores" }) }) {
-                            Icon(Icons.Filled.Search, contentDescription = "Buscar", tint = Color(0xFF4DA3FF))
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    if (homeViewModel?.isLoading?.value == true) {
+                    if (cargandoCatalogo) {
                         Text(
-                            text = "Cargando resultados...",
+                            text = "Cargando catálogo local...",
                             color = Color.White.copy(alpha = 0.72f),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    } else if (!homeViewModel?.errorMessage?.value.isNullOrBlank()) {
-                        Text(
-                            text = "No se pudo cargar contenido. Intenta otra busqueda.",
-                            color = Color(0xFFFFA64D),
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -342,7 +328,6 @@ fun PantallaInicio(
                                     .clickable {
                                         selectedCategoryTitle = category.title
                                         showProductsDialog = true
-                                        homeViewModel?.search(category.title)
                                     },
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
                                 shape = RoundedCornerShape(20.dp),
@@ -392,110 +377,102 @@ fun PantallaInicio(
                             Text("★", color = Color(0xFF3B82F6))
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Productos Destacados",
+                                text = "Productos Disponibles",
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Ver todos",
-                                color = Color(0xFF4DA3FF),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = ">",
-                                color = Color(0xFF4DA3FF),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        featuredItems.forEach { item ->
-                            Card(
-                                modifier = Modifier
-                                    .size(width = 148.dp, height = 210.dp)
-                                    .clickable { item.product?.let { onProductClick?.invoke(it) } },
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
-                                shape = RoundedCornerShape(18.dp)
-                            ) {
-                                Column(
+                    if (featuredItems.isEmpty() && !cargandoCatalogo) {
+                        Text(
+                            text = "No se encontraron productos en el inventario.",
+                            color = Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            featuredItems.forEach { item ->
+                                Card(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween
+                                        .size(width = 148.dp, height = 210.dp)
+                                        .clickable { item.product?.let { onProductClick?.invoke(it) } },
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF121824)),
+                                    shape = RoundedCornerShape(18.dp)
                                 ) {
-                                    Box(
+                                    Column(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(78.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0xFF111827)),
-                                        contentAlignment = Alignment.Center
+                                            .fillMaxSize()
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        if (!item.imageUrl.isNullOrBlank()) {
-                                            AsyncImage(
-                                                model = item.imageUrl,
-                                                contentDescription = item.name,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(52.dp)
-                                                    .clip(RoundedCornerShape(16.dp))
-                                                    .background(item.accent.copy(alpha = 0.18f)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = item.badge,
-                                                    color = item.accent,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(78.dp)
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(Color(0xFF111827)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (!item.imageUrl.isNullOrBlank() && item.imageUrl != "producto_default") {
+                                                AsyncImage(
+                                                    model = item.imageUrl,
+                                                    contentDescription = item.name,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
                                                 )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(52.dp)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(item.accent.copy(alpha = 0.18f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = item.badge,
+                                                        color = item.accent,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
                                             }
                                         }
-                                    }
 
-                                    Column {
-                                        Text(
-                                            text = item.name,
-                                            color = Color.White,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
-                                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
-                                            maxLines = 3,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = item.price,
-                                            color = item.accent,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = item.stockLabel,
-                                            color = Color(0xFF38D996),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Column {
+                                            Text(
+                                                text = item.name,
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+                                                maxLines = 3,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = item.price,
+                                                color = item.accent,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = item.stockLabel,
+                                                color = Color(0xFF38D996),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -517,22 +494,22 @@ fun PantallaInicio(
                         ) {
                             MetricTile(
                                 title = "En stock",
-                                value = "1,248",
-                                subtitle = "productos",
+                                value = productosLocales.sumOf { (it.reviews ?: 0) / 10 }.toString(),
+                                subtitle = "unidades",
                                 accent = Color(0xFF4DA3FF)
                             )
                             Divider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.height(64.dp).width(1.dp))
                             MetricTile(
-                                title = "Bajo inventario",
-                                value = "18",
+                                title = "Catálogo",
+                                value = productosLocales.size.toString(),
                                 subtitle = "productos",
                                 accent = Color(0xFFFFA64D)
                             )
                             Divider(color = Color.White.copy(alpha = 0.08f), modifier = Modifier.height(64.dp).width(1.dp))
                             MetricTile(
-                                title = "Nuevos ingresos",
-                                value = "36",
-                                subtitle = "esta semana",
+                                title = "Nuevos",
+                                value = "Hoy",
+                                subtitle = "actualizado",
                                 accent = Color(0xFF38D996)
                             )
                         }
@@ -540,41 +517,39 @@ fun PantallaInicio(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color(0xFF2B77FF),
-                                            Color(0xFF56C4FF)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .clickable { onOpenInventory?.invoke() }
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
+                    if (isAdmin) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                            shape = RoundedCornerShape(24.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("▣", color = Color.White)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "Ver Inventario",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF2B77FF), Color(0xFF56C4FF))
+                                        ),
+                                        shape = RoundedCornerShape(24.dp)
+                                    )
+                                    .clickable { onOpenInventory?.invoke() }
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("▣", color = Color.White)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Ver Inventario",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height(14.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -639,6 +614,7 @@ fun PantallaInicio(
             }
         }
 
+        // 4. DIÁLOGO CONECTADO A MYSQL
         if (showProductsDialog) {
             Dialog(onDismissRequest = { showProductsDialog = false }) {
                 Card(
@@ -661,22 +637,21 @@ fun PantallaInicio(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        // Filtramos los locales por categoría
+                        val productosEnCategoria = productosLocales.filter {
+                            it.source?.contains(selectedCategoryTitle, ignoreCase = true) == true
+                        }.ifEmpty { productosLocales.take(8) } // Si no hay en esa categoría, mostramos algunos al azar
+
                         when {
-                            homeViewModel?.isLoading?.value == true -> {
+                            cargandoCatalogo -> {
                                 Text(
                                     text = "Cargando productos...",
                                     color = Color.White.copy(alpha = 0.72f)
                                 )
                             }
-                            !homeViewModel?.errorMessage?.value.isNullOrBlank() -> {
-                                Text(
-                                    text = "No se pudieron cargar los productos.",
-                                    color = Color(0xFFFFA64D)
-                                )
-                            }
-                            homeViewModel?.featured?.isNotEmpty() == true -> {
+                            productosLocales.isNotEmpty() -> {
                                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    items(homeViewModel.featured.take(8)) { product ->
+                                    items(productosEnCategoria) { product ->
                                         Card(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -699,7 +674,7 @@ fun PantallaInicio(
                                                         .background(Color(0xFF111827)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    if (!product.thumbnail.isNullOrBlank()) {
+                                                    if (!product.thumbnail.isNullOrBlank() && product.thumbnail != "producto_default") {
                                                         AsyncImage(
                                                             model = product.thumbnail,
                                                             contentDescription = product.title,
@@ -734,7 +709,7 @@ fun PantallaInicio(
                                                     )
                                                     Spacer(modifier = Modifier.height(2.dp))
                                                     Text(
-                                                        text = "Provedor: ${product.source ?: ""}",
+                                                        text = "Categoría: ${product.source ?: ""}",
                                                         color = Color.White.copy(alpha = 0.64f),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         maxLines = 1,
@@ -770,7 +745,6 @@ fun PantallaInicio(
                 }
             }
         }
-
     }
 }
 
@@ -816,4 +790,42 @@ private fun VistaPreviaPantallaInicio() {
         onProductClick = {},
         onProfileClick = {}
     )
+}
+
+suspend fun obtenerCatalogoDeBD(): List<ProductDto> = withContext(Dispatchers.IO) {
+    val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
+    val lista = mutableListOf<ProductDto>()
+    try {
+        val url = URL("$BASE_URL/productos.php")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            val responseStr = connection.inputStream.bufferedReader().use { it.readText() }
+            val jsonResponse = JSONObject(responseStr)
+
+            if (jsonResponse.getBoolean("success")) {
+                val dataArray = jsonResponse.getJSONArray("data")
+                for (i in 0 until dataArray.length()) {
+                    val item = dataArray.getJSONObject(i)
+                    val stockActual = item.optInt("stock_actual", 0)
+
+                    lista.add(
+                        ProductDto(
+                            title = item.optString("nombre_producto"),
+                            extractedPrice = item.optDouble("precio"),
+                            thumbnail = item.optString("imagen_url"),
+                            source = item.optString("categoria"),
+                            // TRUCO: Como tu UI divide reviews / 10 para el stock,
+                            // lo multiplicamos aquí para que la pantalla muestre el stock EXACTO
+                            reviews = stockActual * 10
+                        )
+                    )
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return@withContext lista
 }

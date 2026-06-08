@@ -5,7 +5,7 @@ import com.joel.proyecto2026.models.LoginCredentials
 interface AuthRepository {
     fun getRememberedEmail(): String?
     fun getLoggedUserName(): String?
-    fun getLoggedUserRole(): String? //Esto es para detectar al usuario si es admin o cliente
+    fun getLoggedUserRole(): String?
     fun isLoggedIn(): Boolean
 
 

@@ -103,6 +103,7 @@ class MainActivity : ComponentActivity() {
                             PantallaApp.Home -> {
                                 PantallaInicio(
                                     userName = authRepository.getLoggedUserName(),
+                                    userRole = authRepository.getLoggedUserRole(),
                                     homeViewModel = homeVm,
                                     onOpenInventory = { currentScreen = PantallaApp.Inventory },
                                     onOpenProviders = { currentScreen = PantallaApp.Providers },

@@ -1,4 +1,5 @@
 package com.joel.proyecto2026.ui.screens
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,6 +68,17 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.joel.proyecto2026.network.ProductDto
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
 
 private data class ProviderUi(
     val name: String,
@@ -180,8 +192,16 @@ fun PantallaProveedores(
 ) {
     val defaultQuery = "pc components"
     var search by remember { mutableStateOf("") }
+
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     var selectedProvider by remember { mutableStateOf<ProviderUi?>(null) }
     var requestedProviderName by remember { mutableStateOf<String?>(null) }
+
+    // Estado para controlar qué producto se va a catalogar
+    var productoACatalogar by remember { mutableStateOf<ProductDto?>(null) }
+
 
     LaunchedEffect(homeViewModel) {
         if (
@@ -320,12 +340,46 @@ fun PantallaProveedores(
             }
         }
 
+        // MOSTRAR DIÁLOGO DEL PROVEEDOR
         selectedProvider?.let { provider ->
             ProviderOrderDialog(
                 provider = provider,
                 orderRequested = requestedProviderName == provider.name,
                 onDismiss = { selectedProvider = null },
-                onRequestOrder = { requestedProviderName = provider.name }
+                onRequestOrder = { requestedProviderName = provider.name },
+                onProductClick = { productoACatalogar = it }
+            )
+        }
+
+
+        val prod = productoACatalogar
+        if (prod != null) {
+            DialogoCatalogarProducto(
+                producto = prod,
+                onDismiss = { productoACatalogar = null },
+                onGuardar = { nombre, idCat, pCompra, pVenta, stock ->
+                    // Ejecutamos la función de red en una corrutina
+                    coroutineScope.launch {
+                        val exito = enviarProductoABaseDeDatos(
+                            nombre = nombre,
+                            idCategoria = idCat,
+                            precioCompra = pCompra,
+                            precioVenta = pVenta,
+                            stock = stock,
+                            imagenUrl = prod.thumbnail ?: "cpu" // Tomamos la imagen de la API
+                        )
+
+                        if (exito) {
+                            Toast.makeText(context, "✅ ¡Producto añadido al inventario!", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "❌ Error al guardar en la Base de Datos", Toast.LENGTH_LONG).show()
+                        }
+
+                        // Cerramos las ventanas
+                        productoACatalogar = null
+                        selectedProvider = null
+                    }
+                }
             )
         }
     }
@@ -713,7 +767,8 @@ private fun ProviderOrderDialog(
     provider: ProviderUi,
     orderRequested: Boolean,
     onDismiss: () -> Unit,
-    onRequestOrder: () -> Unit
+    onRequestOrder: () -> Unit,
+    onProductClick: (ProductDto) -> Unit
 ) {
     val productsToOrder = provider.lowStockProducts.ifEmpty { provider.products.take(3) }
 
@@ -796,7 +851,11 @@ private fun ProviderOrderDialog(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     productsToOrder.take(4).forEach { product ->
-                        OrderProductRow(product = product, accent = provider.accent)
+                        OrderProductRow(
+                            product = product,
+                            accent = provider.accent,
+                            onClick = { onProductClick(product) }
+                        )
                     }
                 }
 
@@ -865,12 +924,17 @@ private fun ProviderAvatar(provider: ProviderUi, size: Int) {
 }
 
 @Composable
-private fun OrderProductRow(product: ProductDto, accent: Color) {
+private fun OrderProductRow(
+    product: ProductDto,
+    accent: Color,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Color(0xFF121824))
+            .clickable { onClick() }
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1101,5 +1165,143 @@ private fun VistaPreviaPantallaProveedores() {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DialogoCatalogarProducto(
+    producto: ProductDto,
+    onDismiss: () -> Unit,
+    onGuardar: (nombre: String, idCategoria: Int, precioCompra: Double, precioVenta: Double, stock: Int) -> Unit
+) {
+
+    var nombre by remember { mutableStateOf(producto.title ?: "") }
+    var precioCompraStr by remember { mutableStateOf(producto.extractedPrice?.toString() ?: "") }
+    var precioVentaStr by remember { mutableStateOf("") }
+    var stockStr by remember { mutableStateOf("10") }
+
+    var categoriaSeleccionada by remember { mutableStateOf(1) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.padding(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Catalogar Producto", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Prepara este producto para tus clientes", color = Color.Gray, fontSize = 13.sp)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text("Nombre del Producto", color = Color.Gray) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = precioCompraStr,
+                        onValueChange = { precioCompraStr = it },
+                        label = { Text("Costo (API)", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = precioVentaStr,
+                        onValueChange = { precioVentaStr = it },
+                        label = { Text("Precio Venta", color = Color(0xFF38D996)) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = stockStr,
+                    onValueChange = { stockStr = it },
+                    label = { Text("Unidades a comprar", color = Color.Gray) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+                    ) {
+                        Text("Cancelar", color = Color(0xFFFF4D4D))
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            val pCompra = precioCompraStr.toDoubleOrNull() ?: 0.0
+                            val pVenta = precioVentaStr.toDoubleOrNull() ?: 0.0
+                            val cantStock = stockStr.toIntOrNull() ?: 0
+                            onGuardar(nombre, categoriaSeleccionada, pCompra, pVenta, cantStock)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4DA3FF))
+                    ) {
+                        Text("Subir a Inventario", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+suspend fun enviarProductoABaseDeDatos(
+    nombre: String,
+    idCategoria: Int,
+    precioCompra: Double,
+    precioVenta: Double,
+    stock: Int,
+    imagenUrl: String
+): Boolean = withContext(Dispatchers.IO) {
+    // Tu URL exacta de Ngrok
+    val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
+
+    try {
+        val url = URL("$BASE_URL/restock.php")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.doOutput = true
+
+        // Armamos el JSON con los datos del formulario
+        val jsonParam = JSONObject()
+        jsonParam.put("nombre", nombre)
+        jsonParam.put("id_categoria", idCategoria)
+        jsonParam.put("precio_compra", precioCompra)
+        jsonParam.put("precio_venta", precioVenta)
+        jsonParam.put("stock", stock)
+        jsonParam.put("imagen_url", imagenUrl)
+        jsonParam.put("marca", "Proveedor API")
+
+        val os = OutputStreamWriter(connection.outputStream)
+        os.write(jsonParam.toString())
+        os.flush()
+        os.close()
+
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            val responseStr = connection.inputStream.bufferedReader().use { it.readText() }
+            val jsonResponse = JSONObject(responseStr)
+            return@withContext jsonResponse.optBoolean("success", false)
+        }
+        return@withContext false
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return@withContext false
     }
 }
