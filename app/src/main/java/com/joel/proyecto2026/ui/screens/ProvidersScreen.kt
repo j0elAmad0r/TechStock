@@ -1,57 +1,20 @@
 package com.joel.proyecto2026.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Store
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,130 +22,49 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.joel.proyecto2026.network.ProductDto
 import com.joel.proyecto2026.ui.viewmodel.HomeViewModel
-
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.rememberCoroutineScope
 
+// --- MODELOS LOCALES ---
+data class CategoriaLocal(val id: Int, val nombre: String)
+data class ProductoLocalSimplificado(val id: Int, val nombre: String, val marca: String)
+
+// --- LÓGICA DE UI DE PROVEEDORES ---
 private data class ProviderUi(
     val name: String,
     val products: List<ProductDto>,
     val accent: Color,
     val imageUrl: String? = products.firstNotNullOfOrNull {
-        it.sourceIcon?.takeIf(String::isNotBlank)
-            ?: it.thumbnail?.takeIf(String::isNotBlank)
+        it.sourceIcon?.takeIf(String::isNotBlank) ?: it.thumbnail?.takeIf(String::isNotBlank)
     }
 ) {
-    val initials: String
-        get() = name
-            .split(" ")
-            .filter { it.isNotBlank() }
-            .take(2)
-            .joinToString("") { it.first().uppercase() }
-            .ifBlank { "PV" }
-
-    val productCount: Int
-        get() = products.size
-
-    val categoriesLabel: String
-        get() = products
-            .mapNotNull { it.title }
-            .map { detectCategory(it) }
-            .distinct()
-            .take(3)
-            .joinToString(" • ")
-            .ifBlank { "Componentes" }
-
-    val lowStockCount: Int
-        get() = products.count { getFakeStock(it) <= 10 }
-
-    val lowStockProducts: List<ProductDto>
-        get() = products.filter { getFakeStock(it) <= 10 }
-
-    val stockStatus: String
-        get() = when {
-            lowStockCount >= 3 -> "Stock crítico"
-            lowStockCount >= 1 -> "Revisar stock"
-            else -> "Stock estable"
-        }
-
-    val reliabilityScore: Double
-        get() = (4.1 + productCount.coerceAtMost(8) * 0.08).coerceAtMost(4.9)
-
-    val deliveryLabel: String
-        get() = when {
-            productCount >= 8 -> "24h"
-            productCount >= 4 -> "48h"
-            else -> "72h"
-        }
-
-    val isPreferred: Boolean
-        get() = productCount >= 5 && reliabilityScore >= 4.5
+    val initials: String get() = name.take(2).uppercase()
+    val productCount: Int get() = products.size
+    val lowStockProducts: List<ProductDto> get() = products.take(3)
 }
 
 private fun buildProvidersFromApi(products: List<ProductDto>): List<ProviderUi> {
-    val cleanProducts = products.filter {
-        !it.source.isNullOrBlank() && !it.title.isNullOrBlank()
-    }
-
+    val cleanProducts = products.filter { !it.source.isNullOrBlank() && !it.title.isNullOrBlank() }
     val grouped = cleanProducts.groupBy { it.source!!.trim() }
+    val accents = listOf(Color(0xFF4DA3FF), Color(0xFF38D996), Color(0xFF7C4DFF), Color(0xFFFFA64D), Color(0xFFFF4D6D))
 
-    val accents = listOf(
-        Color(0xFF4DA3FF),
-        Color(0xFF38D996),
-        Color(0xFF7C4DFF),
-        Color(0xFFFFA64D),
-        Color(0xFFFF4D6D)
-    )
-
-    return grouped.entries
-        .mapIndexed { index, entry ->
-            ProviderUi(
-                name = entry.key,
-                products = entry.value,
-                accent = accents[index % accents.size]
-            )
-        }
-        .sortedWith(
-            compareByDescending<ProviderUi> { it.isPreferred }
-                .thenByDescending { it.productCount }
-                .thenBy { it.name }
-        )
-}
-
-private fun detectCategory(title: String): String {
-    val t = title.lowercase()
-
-    return when {
-        "rtx" in t || "geforce" in t || "radeon" in t || "gpu" in t -> "Tarjetas gráficas"
-        "ryzen" in t || "intel" in t || "core i" in t || "cpu" in t -> "Procesadores"
-        "ram" in t || "ddr" in t || "memory" in t -> "Memorias"
-        "ssd" in t || "nvme" in t || "hdd" in t -> "Almacenamiento"
-        "motherboard" in t || "b550" in t || "b650" in t || "z790" in t -> "Placas base"
-        "power" in t || "psu" in t || "fuente" in t -> "Fuentes"
-        "sensor" in t || "arduino" in t -> "Sensores"
-        else -> "Componentes"
-    }
-}
-
-private fun getFakeStock(product: ProductDto): Int {
-    return ((product.reviews ?: 0) / 10).coerceAtLeast(1)
+    return grouped.entries.mapIndexed { index, entry ->
+        ProviderUi(entry.key, entry.value, accents[index % accents.size])
+    }.sortedByDescending { it.productCount }
 }
 
 @Composable
@@ -190,1118 +72,362 @@ fun PantallaProveedores(
     homeViewModel: HomeViewModel? = null,
     onBack: (() -> Unit)? = null
 ) {
-    val defaultQuery = "pc components"
     var search by remember { mutableStateOf("") }
+    var selectedProvider by remember { mutableStateOf<ProviderUi?>(null) }
+    var productoACatalogar by remember { mutableStateOf<ProductDto?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var selectedProvider by remember { mutableStateOf<ProviderUi?>(null) }
-    var requestedProviderName by remember { mutableStateOf<String?>(null) }
+    // ESTADOS PARA DATOS DE MYSQL
+    var categoriasBD by remember { mutableStateOf<List<CategoriaLocal>>(emptyList()) }
+    var productosBD by remember { mutableStateOf<List<ProductoLocalSimplificado>>(emptyList()) }
 
-    // Estado para controlar qué producto se va a catalogar
-    var productoACatalogar by remember { mutableStateOf<ProductDto?>(null) }
-
-
-    LaunchedEffect(homeViewModel) {
-        if (
-            homeViewModel != null &&
-            homeViewModel.featured.isEmpty() &&
-            !homeViewModel.isLoading.value
-        ) {
-            homeViewModel.search(defaultQuery)
+    LaunchedEffect(Unit) {
+        if (homeViewModel?.featured?.isEmpty() == true) {
+            homeViewModel.search("pc components")
         }
+        // Descargamos catálogos reales
+        categoriasBD = obtenerCategoriasDeBD()
+        productosBD = obtenerProductosSimplesDeBD()
     }
 
     val apiProducts = homeViewModel?.featured?.toList().orEmpty()
-
-    val providers by remember(apiProducts) {
-        derivedStateOf {
-            buildProvidersFromApi(apiProducts)
-        }
-    }
-
-    val filteredProviders by remember(search, providers) {
-        derivedStateOf {
-            if (search.isBlank()) {
-                providers
-            } else {
-                providers.filter { provider ->
-                    provider.name.contains(search, ignoreCase = true) ||
-                            provider.categoriesLabel.contains(search, ignoreCase = true)
-                }
-            }
-        }
-    }
+    val providers = buildProvidersFromApi(apiProducts)
+    val filteredProviders = if (search.isBlank()) providers else providers.filter { it.name.contains(search, true) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF030A1D),
-                        Color(0xFF0A1A43),
-                        Color(0xFF040C23)
-                    )
-                )
-            )
+        modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF030A1D), Color(0xFF0A1A43))))
     ) {
-        BackgroundGlow()
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            ProvidersHeader(onBack = onBack)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            SearchProviderBar(
-                value = search,
-                onValueChange = { search = it },
-                onSearchClick = {
-                    val query = search.ifBlank { defaultQuery }
-                    homeViewModel?.search(query)
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { onBack?.invoke() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
                 }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            ProviderSummaryCards(
-                providers = providers,
-                products = apiProducts
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Proveedores encontrados",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Text(
-                    text = "${filteredProviders.size}",
-                    color = Color(0xFF4DA3FF),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Red de Proveedores", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            when {
-                homeViewModel?.isLoading?.value == true -> {
-                    LoadingProviders()
-                }
+            // Search Bar
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                singleLine = true,
+                placeholder = { Text("Buscar proveedor...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+            )
 
-                providers.isEmpty() -> {
-                    EmptyProviders(
-                        onSearchClick = {
-                            homeViewModel?.search(defaultQuery)
-                        }
-                    )
-                }
+            Spacer(modifier = Modifier.height(16.dp))
 
-                filteredProviders.isEmpty() -> {
-                    EmptySearchResult()
-                }
-
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp)
+            // Lista de proveedores
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(filteredProviders) { provider ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { selectedProvider = provider },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF07111D)),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, provider.accent.copy(alpha = 0.3f))
                     ) {
-                        items(
-                            items = filteredProviders,
-                            key = { it.name }
-                        ) { provider ->
-                            ProviderCompactCard(
-                                provider = provider,
-                                onClick = { selectedProvider = provider },
-                                onRequestOrder = {
-                                    requestedProviderName = provider.name
-                                    selectedProvider = provider
-                                }
-                            )
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(provider.accent.copy(alpha=0.2f)), contentAlignment = Alignment.Center) {
+                                Text(provider.initials, color = provider.accent, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(provider.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("${provider.productCount} productos disponibles", color = Color.Gray, fontSize = 12.sp)
+                            }
                         }
                     }
                 }
             }
         }
 
-        // MOSTRAR DIÁLOGO DEL PROVEEDOR
+        // DIÁLOGO DE PRODUCTOS DEL PROVEEDOR
         selectedProvider?.let { provider ->
-            ProviderOrderDialog(
-                provider = provider,
-                orderRequested = requestedProviderName == provider.name,
-                onDismiss = { selectedProvider = null },
-                onRequestOrder = { requestedProviderName = provider.name },
-                onProductClick = { productoACatalogar = it }
-            )
-        }
+            Dialog(onDismissRequest = { selectedProvider = null }) {
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E)), shape = RoundedCornerShape(20.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Catálogo de ${provider.name}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
 
-
-        val prod = productoACatalogar
-        if (prod != null) {
-            DialogoCatalogarProducto(
-                producto = prod,
-                onDismiss = { productoACatalogar = null },
-                onGuardar = { nombre, idCat, pCompra, pVenta, stock ->
-                    // Ejecutamos la función de red en una corrutina
-                    coroutineScope.launch {
-                        val exito = enviarProductoABaseDeDatos(
-                            nombre = nombre,
-                            idCategoria = idCat,
-                            precioCompra = pCompra,
-                            precioVenta = pVenta,
-                            stock = stock,
-                            imagenUrl = prod.thumbnail ?: "cpu" // Tomamos la imagen de la API
-                        )
-
-                        if (exito) {
-                            Toast.makeText(context, "✅ ¡Producto añadido al inventario!", Toast.LENGTH_LONG).show()
-                        } else {
-                            Toast.makeText(context, "❌ Error al guardar en la Base de Datos", Toast.LENGTH_LONG).show()
+                        provider.products.take(6).forEach { product ->
+                            Row(modifier = Modifier.fillMaxWidth().clickable {
+                                productoACatalogar = product
+                            }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Inventory2, contentDescription = null, tint = provider.accent)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(product.title ?: "Producto", color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
 
-                        // Cerramos las ventanas
+                        Button(onClick = { selectedProvider = null }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Cerrar")
+                        }
+                    }
+                }
+            }
+        }
+
+        // SÚPER-FORMULARIO DE RESTOCK
+        val prod = productoACatalogar
+        if (prod != null) {
+            DialogoCatalogarAvanzado(
+                productoApi = prod,
+                categoriasBD = categoriasBD,
+                productosBD = productosBD,
+                onDismiss = { productoACatalogar = null },
+                onGuardarExistente = { idProd, stock ->
+                    coroutineScope.launch {
+                        val exito = sumarStockABaseDeDatos(idProd, stock)
+                        Toast.makeText(context, if (exito) "✅ Stock actualizado" else "❌ Error", Toast.LENGTH_SHORT).show()
                         productoACatalogar = null
                         selectedProvider = null
                     }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun BackgroundGlow() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(210.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            Color(0xFF236BFF).copy(alpha = 0.28f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(180.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            Color(0xFF38D996).copy(alpha = 0.12f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-    }
-}
-
-@Composable
-private fun ProvidersHeader(
-    onBack: (() -> Unit)?
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(52.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = { onBack?.invoke() }) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Volver",
-                tint = Color.White
-            )
-        }
-
-        Text(
-            text = "Proveedores",
-            color = Color.White,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.width(48.dp))
-    }
-}
-
-@Composable
-private fun SearchProviderBar(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onSearchClick: () -> Unit
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        placeholder = {
-            Text(
-                text = "Buscar proveedores de la API",
-                color = Color.White.copy(alpha = 0.45f)
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.72f)
-            )
-        },
-        trailingIcon = {
-            IconButton(onClick = onSearchClick) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "Buscar",
-                    tint = Color(0xFF4DA3FF)
-                )
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFF07111D),
-            unfocusedContainerColor = Color(0xFF07111D),
-            focusedBorderColor = Color.White.copy(alpha = 0.18f),
-            unfocusedBorderColor = Color.White.copy(alpha = 0.10f),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            cursorColor = Color(0xFF4DA3FF)
-        )
-    )
-}
-
-@Composable
-private fun ProviderSummaryCards(
-    providers: List<ProviderUi>,
-    products: List<ProductDto>
-) {
-    val totalLowStock = products.count { getFakeStock(it) <= 10 }
-    val preferredCount = providers.count { it.isPreferred }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        MiniSummaryCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Filled.Store,
-            title = "Proveedores",
-            value = providers.size.toString(),
-            accent = Color(0xFF4DA3FF)
-        )
-
-        MiniSummaryCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Filled.Warning,
-            title = "Bajo stock",
-            value = totalLowStock.toString(),
-            accent = Color(0xFFFFA64D)
-        )
-
-        MiniSummaryCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Filled.Star,
-            title = "Preferidos",
-            value = preferredCount.toString(),
-            accent = Color(0xFF38D996)
-        )
-    }
-}
-
-@Composable
-private fun MiniSummaryCard(
-    modifier: Modifier,
-    icon: ImageVector,
-    title: String,
-    value: String,
-    accent: Color
-) {
-    Card(
-        modifier = modifier.height(92.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
-        ),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(10.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(22.dp)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = value,
-                color = Color.White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-
-            Text(
-                text = title,
-                color = Color.White.copy(alpha = 0.62f),
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProviderCompactCard(
-    provider: ProviderUi,
-    onClick: () -> Unit = {},
-    onRequestOrder: () -> Unit = {}
-) {
-    val statusColor = when (provider.stockStatus) {
-        "Stock crítico" -> Color(0xFFFF4D4D)
-        "Revisar stock" -> Color(0xFFFFA64D)
-        else -> Color(0xFF38D996)
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (provider.isPreferred) provider.accent.copy(alpha = 0.6f)
-            else Color.White.copy(alpha = 0.08f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(70.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(provider.accent.copy(alpha = 0.13f))
-                    .border(
-                        width = 1.dp,
-                        color = provider.accent.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(18.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!provider.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = provider.imageUrl,
-                        contentDescription = provider.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text(
-                        text = provider.initials,
-                        color = provider.accent,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = provider.name,
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    if (provider.isPreferred) {
-                        SmallPill(
-                            text = "Preferido",
-                            color = Color(0xFF4DA3FF)
-                        )
+                },
+                onGuardarNuevo = { nombre, idCat, nuevaCat, pCompra, pVenta, stock ->
+                    coroutineScope.launch {
+                        val exito = enviarProductoNuevoABD(nombre, idCat, nuevaCat, pCompra, pVenta, stock, prod.thumbnail ?: "")
+                        Toast.makeText(context, if (exito) "✅ Producto creado" else "❌ Error", Toast.LENGTH_SHORT).show()
+                        productoACatalogar = null
+                        selectedProvider = null
+                        // Recargar BD local para futuras operaciones
+                        productosBD = obtenerProductosSimplesDeBD()
+                        categoriasBD = obtenerCategoriasDeBD()
                     }
                 }
-
-                Spacer(modifier = Modifier.height(5.dp))
-
-                Text(
-                    text = provider.categoriesLabel,
-                    color = Color.White.copy(alpha = 0.63f),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ProviderMiniInfo(
-                        icon = Icons.Filled.Inventory2,
-                        value = "${provider.productCount + 3 * 2} productos"
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    ProviderMiniInfo(
-                        icon = Icons.Filled.Shield,
-                        value = String.format("%.1f / 5", provider.reliabilityScore)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    ProviderMiniInfo(
-                        icon = Icons.Filled.Store,
-                        value = provider.deliveryLabel
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                SmallPill(
-                    text = provider.stockStatus,
-                    color = statusColor
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(horizontalAlignment = Alignment.End) {
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
-
-                if (provider.lowStockCount > 0) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    ReorderButton(onClick = onRequestOrder)
-                }
-            }
+            )
         }
     }
 }
 
 @Composable
-private fun ReorderButton(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF4DA3FF).copy(alpha = 0.16f))
-            .border(
-                width = 1.dp,
-                color = Color(0xFF4DA3FF).copy(alpha = 0.45f),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 9.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Filled.LocalShipping,
-            contentDescription = null,
-            tint = Color(0xFF4DA3FF),
-            modifier = Modifier.size(15.dp)
-        )
-    }
-}
-
-@Composable
-private fun ProviderOrderDialog(
-    provider: ProviderUi,
-    orderRequested: Boolean,
+fun DialogoCatalogarAvanzado(
+    productoApi: ProductDto,
+    categoriasBD: List<CategoriaLocal>,
+    productosBD: List<ProductoLocalSimplificado>,
     onDismiss: () -> Unit,
-    onRequestOrder: () -> Unit,
-    onProductClick: (ProductDto) -> Unit
+    onGuardarExistente: (Int, Int) -> Unit,
+    onGuardarNuevo: (String, Int, String, Double, Double, Int) -> Unit
 ) {
-    val productsToOrder = provider.lowStockProducts.ifEmpty { provider.products.take(3) }
+    var esNuevoProducto by remember { mutableStateOf(false) }
+
+    // Campos Existente
+    var selectedProductoBd by remember { mutableStateOf(productosBD.firstOrNull()) }
+    var stockSumarStr by remember { mutableStateOf("10") }
+    var expandirDropdownProd by remember { mutableStateOf(false) }
+
+    // Campos Nuevo
+    var nombre by remember { mutableStateOf(productoApi.title ?: "") }
+    var precioCompra by remember { mutableStateOf(productoApi.extractedPrice?.toString() ?: "0.0") }
+    var precioVenta by remember { mutableStateOf("") }
+    var stockInicial by remember { mutableStateOf("10") }
+
+    // Categoría
+    var crearCategoriaNueva by remember { mutableStateOf(false) }
+    var categoriaSeleccionada by remember { mutableStateOf(categoriasBD.firstOrNull()) }
+    var nombreNuevaCategoria by remember { mutableStateOf("") }
+    var expandirDropdownCat by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.padding(12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E)),
-            shape = RoundedCornerShape(22.dp),
-            border = BorderStroke(1.dp, provider.accent.copy(alpha = 0.35f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ProviderAvatar(provider = provider, size = 54)
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = provider.name,
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Reposicion de inventario",
-                            color = Color.White.copy(alpha = 0.62f),
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.Close, contentDescription = "Cerrar", tint = Color.White)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                if (orderRequested) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF38D996).copy(alpha = 0.12f))
-                            .border(
-                                width = 1.dp,
-                                color = Color(0xFF38D996).copy(alpha = 0.34f),
-                                shape = RoundedCornerShape(14.dp)
-                            )
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF38D996),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Pedido solicitado para rellenar stock.",
-                            color = Color(0xFF38D996),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                Text(
-                    text = "Productos sugeridos",
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    productsToOrder.take(4).forEach { product ->
-                        OrderProductRow(
-                            product = product,
-                            accent = provider.accent,
-                            onClick = { onProductClick(product) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Button(
-                    onClick = onRequestOrder,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    enabled = !orderRequested,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4DA3FF),
-                        disabledContainerColor = Color(0xFF38D996).copy(alpha = 0.22f),
-                        disabledContentColor = Color(0xFF38D996)
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (orderRequested) Icons.Filled.CheckCircle else Icons.Filled.LocalShipping,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = if (orderRequested) "Solicitud enviada" else "Realizar pedido",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProviderAvatar(provider: ProviderUi, size: Int) {
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(provider.accent.copy(alpha = 0.13f))
-            .border(
-                width = 1.dp,
-                color = provider.accent.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(16.dp)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        if (!provider.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = provider.imageUrl,
-                contentDescription = provider.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Text(
-                text = provider.initials,
-                color = provider.accent,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun OrderProductRow(
-    product: ProductDto,
-    accent: Color,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF121824))
-            .clickable { onClick() }
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(accent.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!product.thumbnail.isNullOrBlank()) {
-                AsyncImage(
-                    model = product.thumbnail,
-                    contentDescription = product.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(Icons.Filled.Inventory2, contentDescription = null, tint = accent)
-            }
-        }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = product.title ?: "Producto",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "Stock actual: ${getFakeStock(product)}",
-                color = Color.White.copy(alpha = 0.62f),
-                fontSize = 11.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProviderMiniInfo(
-    icon: ImageVector,
-    value: String
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.48f),
-            modifier = Modifier.size(14.dp)
-        )
-
-        Spacer(modifier = Modifier.width(4.dp))
-
-        Text(
-            text = value,
-            color = Color.White.copy(alpha = 0.66f),
-            fontSize = 11.sp,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun SmallPill(
-    text: String,
-    color: Color
-) {
-    Row(
-        modifier = Modifier
-            .widthIn(min = 74.dp)
-            .clip(RoundedCornerShape(50.dp))
-            .background(color.copy(alpha = 0.13f))
-            .border(
-                width = 1.dp,
-                color = color.copy(alpha = 0.38f),
-                shape = RoundedCornerShape(50.dp)
-            )
-            .padding(horizontal = 9.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        Text(
-            text = text,
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun LoadingProviders() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
-        ),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Cargando proveedores desde la API...",
-                color = Color.White.copy(alpha = 0.72f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyProviders(
-    onSearchClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(190.dp)
-            .clickable { onSearchClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
-        ),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Store,
-                contentDescription = null,
-                tint = Color(0xFF4DA3FF),
-                modifier = Modifier.size(38.dp)
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "No hay proveedores cargados",
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Toca aquí para consultar proveedores desde la API.",
-                color = Color.White.copy(alpha = 0.62f),
-                fontSize = 13.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptySearchResult() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF07111D)
-        ),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No se encontraron proveedores con esa búsqueda.",
-                color = Color.White.copy(alpha = 0.72f)
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun VistaPreviaPantallaProveedores() {
-    val sample = listOf(
-        ProviderUi("Distribuidor A", emptyList(), Color(0xFF4DA3FF)),
-        ProviderUi("Distribuidor B", emptyList(), Color(0xFF38D996)),
-        ProviderUi("Distribuidor C", emptyList(), Color(0xFF7C4DFF)),
-        ProviderUi("Distribuidor D", emptyList(), Color(0xFFFFA64D))
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF030A1D), Color(0xFF0A1A43))
-                )
-            )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            ProviderSummaryCards(providers = sample, products = emptyList())
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(sample) { p ->
-                    ProviderCompactCard(provider = p)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DialogoCatalogarProducto(
-    producto: ProductDto,
-    onDismiss: () -> Unit,
-    onGuardar: (nombre: String, idCategoria: Int, precioCompra: Double, precioVenta: Double, stock: Int) -> Unit
-) {
-
-    var nombre by remember { mutableStateOf(producto.title ?: "") }
-    var precioCompraStr by remember { mutableStateOf(producto.extractedPrice?.toString() ?: "") }
-    var precioVentaStr by remember { mutableStateOf("") }
-    var stockStr by remember { mutableStateOf("10") }
-
-    var categoriaSeleccionada by remember { mutableStateOf(1) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.padding(16.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E))
-        ) {
+        Card(modifier = Modifier.padding(8.dp), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B111E))) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Catalogar Producto", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Prepara este producto para tus clientes", color = Color.Gray, fontSize = 13.sp)
+                Text("Catalogar Inventario", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = nombre,
-                    onValueChange = { nombre = it },
-                    label = { Text("Nombre del Producto", color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = precioCompraStr,
-                        onValueChange = { precioCompraStr = it },
-                        label = { Text("Costo (API)", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = precioVentaStr,
-                        onValueChange = { precioVentaStr = it },
-                        label = { Text("Precio Venta", color = Color(0xFF38D996)) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                        modifier = Modifier.weight(1f)
-                    )
+                // SWITCH EXISTENTE / NUEVO
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sumar a existente", color = if (!esNuevoProducto) Color(0xFF4DA3FF) else Color.Gray)
+                    Switch(checked = esNuevoProducto, onCheckedChange = { esNuevoProducto = it }, modifier = Modifier.padding(horizontal = 8.dp))
+                    Text("Crear tupla nueva", color = if (esNuevoProducto) Color(0xFF38D996) else Color.Gray)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = stockStr,
-                    onValueChange = { stockStr = it },
-                    label = { Text("Unidades a comprar", color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
-                    ) {
-                        Text("Cancelar", color = Color(0xFFFF4D4D))
+                if (!esNuevoProducto) {
+                    // MODO: PRODUCTO EXISTENTE
+                    Text("Selecciona el producto en BD:", color = Color.Gray, fontSize = 13.sp)
+                    Box {
+                        OutlinedTextField(
+                            value = selectedProductoBd?.nombre ?: "Sin productos en BD",
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth().clickable { expandirDropdownProd = true },
+                            colors = OutlinedTextFieldDefaults.colors(disabledTextColor = Color.White)
+                        )
+                        DropdownMenu(expanded = expandirDropdownProd, onDismissRequest = { expandirDropdownProd = false }) {
+                            productosBD.forEach { p ->
+                                DropdownMenuItem(text = { Text(p.nombre) }, onClick = { selectedProductoBd = p; expandirDropdownProd = false })
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = stockSumarStr, onValueChange = { stockSumarStr = it },
+                        label = { Text("Cantidad a comprar (Stock)", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
 
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = { selectedProductoBd?.let { onGuardarExistente(it.id, stockSumarStr.toIntOrNull() ?: 0) } },
+                        modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4DA3FF))
+                    ) { Text("Sumar Stock al Inventario") }
+
+                } else {
+                    // MODO: PRODUCTO NUEVO
+                    OutlinedTextField(
+                        value = nombre, onValueChange = { nombre = it },
+                        label = { Text("Nombre del Producto", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = precioCompra, onValueChange = { precioCompra = it },
+                            label = { Text("Costo", color = Color.Gray) },
+                            modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                        OutlinedTextField(
+                            value = precioVenta, onValueChange = { precioVenta = it },
+                            label = { Text("P. Venta", color = Color(0xFF38D996)) },
+                            modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = stockInicial, onValueChange = { stockInicial = it },
+                        label = { Text("Stock Inicial", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    )
+
+                    // SELECTOR DE CATEGORÍA
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = crearCategoriaNueva, onCheckedChange = { crearCategoriaNueva = it })
+                        Text("Crear categoría nueva", color = Color.White)
+                    }
+
+                    if (crearCategoriaNueva) {
+                        OutlinedTextField(
+                            value = nombreNuevaCategoria, onValueChange = { nombreNuevaCategoria = it },
+                            label = { Text("Nombre de nueva categoría", color = Color(0xFFFFA64D)) },
+                            modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
+                    } else {
+                        Box {
+                            OutlinedTextField(
+                                value = categoriaSeleccionada?.nombre ?: "Seleccionar Categoría",
+                                onValueChange = {}, readOnly = true, enabled = false,
+                                modifier = Modifier.fillMaxWidth().clickable { expandirDropdownCat = true },
+                                colors = OutlinedTextFieldDefaults.colors(disabledTextColor = Color.White)
+                            )
+                            DropdownMenu(expanded = expandirDropdownCat, onDismissRequest = { expandirDropdownCat = false }) {
+                                categoriasBD.forEach { c ->
+                                    DropdownMenuItem(text = { Text(c.nombre) }, onClick = { categoriaSeleccionada = c; expandirDropdownCat = false })
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
                     Button(
                         onClick = {
-                            val pCompra = precioCompraStr.toDoubleOrNull() ?: 0.0
-                            val pVenta = precioVentaStr.toDoubleOrNull() ?: 0.0
-                            val cantStock = stockStr.toIntOrNull() ?: 0
-                            onGuardar(nombre, categoriaSeleccionada, pCompra, pVenta, cantStock)
+                            val pC = precioCompra.toDoubleOrNull() ?: 0.0
+                            val pV = precioVenta.toDoubleOrNull() ?: 0.0
+                            val st = stockInicial.toIntOrNull() ?: 0
+                            val idCat = if (crearCategoriaNueva) 0 else (categoriaSeleccionada?.id ?: 0)
+                            onGuardarNuevo(nombre, idCat, if(crearCategoriaNueva) nombreNuevaCategoria else "", pC, pV, st)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4DA3FF))
-                    ) {
-                        Text("Subir a Inventario", color = Color.White)
-                    }
+                        modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38D996))
+                    ) { Text("Crear y Catalogar Producto") }
                 }
             }
         }
     }
 }
 
+// --- CONEXIONES AL BACKEND PHP ---
 
-suspend fun enviarProductoABaseDeDatos(
-    nombre: String,
-    idCategoria: Int,
-    precioCompra: Double,
-    precioVenta: Double,
-    stock: Int,
-    imagenUrl: String
-): Boolean = withContext(Dispatchers.IO) {
-    // Tu URL exacta de Ngrok
+suspend fun obtenerCategoriasDeBD(): List<CategoriaLocal> = withContext(Dispatchers.IO) {
     val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
-
+    val lista = mutableListOf<CategoriaLocal>()
     try {
-        val url = URL("$BASE_URL/restock.php")
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.doOutput = true
-
-        // Armamos el JSON con los datos del formulario
-        val jsonParam = JSONObject()
-        jsonParam.put("nombre", nombre)
-        jsonParam.put("id_categoria", idCategoria)
-        jsonParam.put("precio_compra", precioCompra)
-        jsonParam.put("precio_venta", precioVenta)
-        jsonParam.put("stock", stock)
-        jsonParam.put("imagen_url", imagenUrl)
-        jsonParam.put("marca", "Proveedor API")
-
-        val os = OutputStreamWriter(connection.outputStream)
-        os.write(jsonParam.toString())
-        os.flush()
-        os.close()
-
+        val connection = URL("$BASE_URL/obtener_categorias.php").openConnection() as HttpURLConnection
         if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-            val responseStr = connection.inputStream.bufferedReader().use { it.readText() }
-            val jsonResponse = JSONObject(responseStr)
-            return@withContext jsonResponse.optBoolean("success", false)
+            val json = JSONObject(connection.inputStream.bufferedReader().readText())
+            if (json.getBoolean("success")) {
+                val array = json.getJSONArray("data")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    lista.add(CategoriaLocal(obj.getInt("id_categoria"), obj.getString("nombre_categoria")))
+                }
+            }
         }
-        return@withContext false
-    } catch (e: Exception) {
-        e.printStackTrace()
-        return@withContext false
-    }
+    } catch (e: Exception) { e.printStackTrace() }
+    lista
+}
+
+suspend fun obtenerProductosSimplesDeBD(): List<ProductoLocalSimplificado> = withContext(Dispatchers.IO) {
+    val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
+    val lista = mutableListOf<ProductoLocalSimplificado>()
+    try {
+        val connection = URL("$BASE_URL/productos.php").openConnection() as HttpURLConnection
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            val json = JSONObject(connection.inputStream.bufferedReader().readText())
+            if (json.getBoolean("success")) {
+                val array = json.getJSONArray("data")
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    lista.add(ProductoLocalSimplificado(obj.getInt("id_producto"), obj.getString("nombre_producto"), obj.optString("marca", "")))
+                }
+            }
+        }
+    } catch (e: Exception) { e.printStackTrace() }
+    lista
+}
+
+suspend fun sumarStockABaseDeDatos(idProducto: Int, cantidad: Int): Boolean = withContext(Dispatchers.IO) {
+    val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
+    try {
+        val connection = URL("$BASE_URL/sumar_stock.php").openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        val json = JSONObject().apply { put("id_producto", idProducto); put("cantidad", cantidad) }
+        OutputStreamWriter(connection.outputStream).use { it.write(json.toString()) }
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            return@withContext JSONObject(connection.inputStream.bufferedReader().readText()).optBoolean("success", false)
+        }
+    } catch (e: Exception) { e.printStackTrace() }
+    false
+}
+
+suspend fun enviarProductoNuevoABD(nombre: String, idCat: Int, nuevaCat: String, pCompra: Double, pVenta: Double, stock: Int, imagenUrl: String): Boolean = withContext(Dispatchers.IO) {
+    val BASE_URL = "https://horologic-subreniform-angelika.ngrok-free.dev/techstock"
+    try {
+        val connection = URL("$BASE_URL/restock.php").openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        val json = JSONObject().apply {
+            put("nombre", nombre)
+            put("id_categoria", idCat)
+            put("nueva_categoria", nuevaCat)
+            put("precio_compra", pCompra)
+            put("precio_venta", pVenta)
+            put("stock", stock)
+            put("imagen_url", imagenUrl)
+        }
+        OutputStreamWriter(connection.outputStream).use { it.write(json.toString()) }
+        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+            return@withContext JSONObject(connection.inputStream.bufferedReader().readText()).optBoolean("success", false)
+        }
+    } catch (e: Exception) { e.printStackTrace() }
+    false
 }

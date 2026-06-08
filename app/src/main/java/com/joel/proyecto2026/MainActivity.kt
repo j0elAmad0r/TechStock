@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import com.joel.proyecto2026.ui.theme.Proyecto2026Theme
 import com.joel.proyecto2026.network.ProductDto
 import com.joel.proyecto2026.ui.screens.PantallaPerfil
+import com.joel.proyecto2026.ui.screens.AdminDashboardScreen // <-- Import agregado
 
 private enum class PantallaApp {
     Loading,
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
                 )
 
                 LaunchedEffect(Unit) {
-                        currentScreen = if (authRepository.isLoggedIn()) {
+                    currentScreen = if (authRepository.isLoggedIn()) {
                         PantallaApp.Home
                     } else {
                         PantallaApp.Login
@@ -101,18 +102,32 @@ class MainActivity : ComponentActivity() {
                             )
 
                             PantallaApp.Home -> {
-                                PantallaInicio(
-                                    userName = authRepository.getLoggedUserName(),
-                                    userRole = authRepository.getLoggedUserRole(),
-                                    homeViewModel = homeVm,
-                                    onOpenInventory = { currentScreen = PantallaApp.Inventory },
-                                    onOpenProviders = { currentScreen = PantallaApp.Providers },
-                                    onOpenSettings = { currentScreen = PantallaApp.Settings },
-                                    cantidadCarrito = carritoVm.totalArticulos(),
-                                    onAbrirCarrito = { currentScreen = PantallaApp.Checkout },
-                                    onProductClick = { productoSeleccionado = it },
-                                    onProfileClick = { currentScreen = PantallaApp.Profile }
-                                )
+                                // Lógica de enrutamiento basada en el rol
+                                val role = authRepository.getLoggedUserRole()?.trim()?.lowercase() ?: ""
+                                val isAdmin = role == "1" || role.contains("administrador")
+
+                                if (isAdmin) {
+                                    AdminDashboardScreen(
+                                        userName = authRepository.getLoggedUserName(),
+                                        onOpenInventory = { currentScreen = PantallaApp.Inventory },
+                                        onOpenProviders = { currentScreen = PantallaApp.Providers },
+                                        onOpenStatistics = { /* TODO: Pantalla de estadísticas en Fase 4 */ },
+                                        onProfileClick = { currentScreen = PantallaApp.Profile }
+                                    )
+                                } else {
+                                    PantallaInicio(
+                                        userName = authRepository.getLoggedUserName(),
+                                        userRole = authRepository.getLoggedUserRole(),
+                                        homeViewModel = homeVm,
+                                        onOpenInventory = { currentScreen = PantallaApp.Inventory },
+                                        onOpenProviders = { currentScreen = PantallaApp.Providers },
+                                        onOpenSettings = { currentScreen = PantallaApp.Settings },
+                                        cantidadCarrito = carritoVm.totalArticulos(),
+                                        onAbrirCarrito = { currentScreen = PantallaApp.Checkout },
+                                        onProductClick = { productoSeleccionado = it },
+                                        onProfileClick = { currentScreen = PantallaApp.Profile }
+                                    )
+                                }
                             }
 
                             PantallaApp.Inventory -> {
